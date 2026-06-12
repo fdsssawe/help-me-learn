@@ -2,46 +2,47 @@
 
 import { subDays, startOfDay, endOfDay } from "date-fns"
 import { revalidatePath } from "next/cache"
+import type { Prisma } from "@/app/generated/prisma/client"
 import { prisma } from "@/lib/prisma"
 import { requireUserId as requireUser } from "@/lib/dal"
 import { XP_PER_CORRECT, XP_QUIZ_COMPLETION_BONUS, BADGES } from "@/lib/levels"
 
 type QuizMode = "last_lesson" | "last_week" | "random_30"
+export type QuizStyle = "words" | "sentences"
 
-export async function getQuizWords(mode: QuizMode, languageId?: string) {
+export async function getQuizWords(
+  mode: QuizMode,
+  languageId?: string,
+  style: QuizStyle = "words"
+) {
   const userId = await requireUser()
   const now = new Date()
-  const langFilter = languageId ? { languageId } : {}
+  const base: Prisma.WordWhereInput = { userId }
+  if (languageId) base.languageId = languageId
+  // Sentences (cloze) only works for words that have example sentences.
+  if (style === "sentences") base.lemma = { examples: { some: {} } }
 
-  let words
-  if (mode === "last_lesson") {
-    const yesterday = subDays(now, 1)
-    words = await prisma.word.findMany({
-      where: {
-        userId,
-        ...langFilter,
-        createdAt: {
-          gte: startOfDay(yesterday),
-          lte: endOfDay(yesterday),
-        },
-      },
-      take: 30,
-    })
-  } else if (mode === "last_week") {
-    words = await prisma.word.findMany({
-      where: {
-        userId,
-        ...langFilter,
-        createdAt: { gte: subDays(now, 7) },
-      },
-      take: 30,
-    })
-  } else {
-    const all = await prisma.word.findMany({ where: { userId, ...langFilter } })
-    words = all.sort(() => Math.random() - 0.5).slice(0, 30)
+  const include = {
+    lemma: { include: { examples: { orderBy: { order: "asc" as const } } } },
   }
 
-  return words
+  if (mode === "last_lesson") {
+    const yesterday = subDays(now, 1)
+    return prisma.word.findMany({
+      where: { ...base, createdAt: { gte: startOfDay(yesterday), lte: endOfDay(yesterday) } },
+      take: 30,
+      include,
+    })
+  }
+  if (mode === "last_week") {
+    return prisma.word.findMany({
+      where: { ...base, createdAt: { gte: subDays(now, 7) } },
+      take: 30,
+      include,
+    })
+  }
+  const all = await prisma.word.findMany({ where: base, include })
+  return all.sort(() => Math.random() - 0.5).slice(0, 30)
 }
 
 export async function saveQuizSession(data: {

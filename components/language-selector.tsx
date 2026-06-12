@@ -36,7 +36,9 @@ export function LanguageSelector({ languages, activeLangId, basePath }: Language
   const addedNames = new Set(languages.map((l) => l.name.toLowerCase()))
 
   function navigate(langId?: string) {
-    router.push(langId ? `${basePath}?lang=${langId}` : basePath)
+    startTransition(() => {
+      router.push(langId ? `${basePath}?lang=${langId}` : basePath)
+    })
   }
 
   function handleAddPreset(name: string) {
@@ -63,7 +65,7 @@ export function LanguageSelector({ languages, activeLangId, basePath }: Language
   return (
     <>
       <div className="mb-6">
-        <div className="flex items-center gap-1.5 flex-wrap">
+        <div className={`flex items-center gap-1.5 flex-wrap transition-opacity ${isPending ? "opacity-60" : ""}`}>
           {/* All pill */}
           <Pill active={!activeLangId} onClick={() => navigate()}>
             <Globe size={13} strokeWidth={2} />
@@ -75,19 +77,14 @@ export function LanguageSelector({ languages, activeLangId, basePath }: Language
             const isActive = activeLangId === lang.id
             return (
               <div key={lang.id} className="group relative inline-flex">
-                <Pill active={isActive} onClick={() => navigate(lang.id)} extraPadding>
+                <Pill active={isActive} onClick={() => navigate(lang.id)}>
                   {lang.name}
-                  <span className=" font-bold opacity-65">{lang._count.words}</span>
+                  <span className="font-bold opacity-65">{lang._count.words}</span>
                 </Pill>
                 <button
                   onClick={(e) => { e.stopPropagation(); setPendingDelete({ id: lang.id, name: lang.name }) }}
                   title={`Remove ${lang.name}`}
-                  className={`
-                    absolute right-[7px] top-1/2 -translate-y-1/2 w-[17px] h-[17px] rounded-full
-                    border-0 cursor-pointer flex items-center justify-center flex-shrink-0
-                    opacity-0 group-hover:opacity-100 transition-opacity z-10
-                    ${isActive ? "bg-white/25 text-primary-fg" : "bg-error-bg text-error"}
-                  `}
+                  className="absolute -right-1 -top-1 w-[16px] h-[16px] rounded-full bg-error text-white border border-bg-card flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity z-10 shadow-sm cursor-pointer"
                 >
                   <X size={9} strokeWidth={3} />
                 </button>
@@ -191,20 +188,17 @@ function Pill({
   active,
   onClick,
   children,
-  extraPadding,
 }: {
   active: boolean
   onClick: () => void
   children: React.ReactNode
-  extraPadding?: boolean
 }) {
   return (
     <button
       onClick={onClick}
       className={`
         inline-flex items-center gap-1.5 rounded-full text-[0.85rem] font-semibold
-        cursor-pointer border-[1.5px] transition-all whitespace-nowrap
-        ${extraPadding ? "pl-3.5 pr-[30px] py-1.5" : "px-3.5 py-1.5"}
+        cursor-pointer border-[1.5px] px-3.5 py-1.5 transition-colors whitespace-nowrap
         ${active
           ? "bg-primary border-primary text-primary-fg"
           : "bg-bg-subtle border-border text-text-secondary"

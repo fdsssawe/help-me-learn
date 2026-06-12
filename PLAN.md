@@ -65,7 +65,7 @@ Enrichment pipeline: server-side only; check Lemma cache → miss → create `pe
   - ✅ Add-Language popover restricted to enrichment-supported languages (driven by `LANGUAGES` registry); custom free-text removed
   - Note: enrichment runs **inline** in `createWord` (~2s cold, cached after). Avoid shadcn's `combobox` recipe — it tries to overwrite our custom `button.tsx`; use base-ui `Autocomplete` directly. UI primitives via shadcn CLI (see memory).
   - Deferred (optional, not blocking): re-enrich on word edit; cap/lazy-load conjugations; broaden languages
-- **Phase 2 — Target languages (EN/UK)** 🔄 mostly done (engine verified; nav picker pending browser test)
+- **Phase 2 — Target languages (EN/UK) + Spanish** ✅ DONE (committed/pushed)
   - ✅ Multi-target translations: `Lemma.targetLang` (cache key now `(text, langCode, targetLang)`), `User.nativeLang` (en|uk)
   - ✅ `lib/enrichment/translate.ts` — provider-agnostic MT (MyMemory, free/no-key; swap to DeepL later by editing one file). UK meanings = MT of the English kaikki glosses; EN needs no translation
   - ✅ Tatoeba parameterized by target ISO (`eng`/`ukr`); `TARGET_LANGUAGES` registry + `resolveTarget`
@@ -73,8 +73,12 @@ Enrichment pipeline: server-side only; check Lemma cache → miss → create `pe
   - ✅ Verified it→uk (Ukrainian meanings + Ukrainian Tatoeba examples) AND it→en coexist as separate cached lemmas
   - ✅ Source languages: **Italian + Spanish** (registry-driven — adding one = a single `LANGUAGES` entry; verified kaikki/Tatoeba/`<code>.wiktionary` coverage). Engine is fully language-agnostic.
   - ⬜ Deferred: re-enrich existing words when native lang changes (today switching only affects NEW words — old words keep their original-target lemma); CEFR; smarter conjugation grouping; filter kaikki "inflection of" form-senses; more source languages
-- **Phase 3 — Cloze quizzes** ⬜
-  - Quizzes from stored examples (reuses existing XP/streak/badge engine)
+- **Phase 3 — Cloze quizzes** 🔄 built (engine + UI; pending browser test)
+  - ✅ Per-session **Words ↔ Sentences** toggle — shadcn **Switch** (restyled), client `app/(app)/quiz/style-toggle.tsx`; `?style=words|sentences` threaded through mode links + session + back links
+  - ✅ `getQuizWords(mode, lang, style)` now includes `lemma.examples`; Sentences filters to words with examples (`lemma: { examples: { some } }`) + style-aware counts & empty state
+  - ✅ Cloze: blanks the target word via `targetOffsets`, shows the translation as the hint; accepts the exact inflected form OR the headword; a word with no usable example falls back to translate
+  - Reuses the existing XP/streak/badge/save flow unchanged
+  - ⬜ Pending browser verification
 - **Phase 4 — Paywall** ⬜
   - 50-word gate enforced server-side in `createWord`; Lemon Squeezy checkout + webhook flips `User.plan`
 

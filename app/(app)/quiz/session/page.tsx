@@ -39,10 +39,25 @@ function Spinner({ color = "border-t-primary" }: { color?: string }) {
   )
 }
 
+// Build a cloze (fill-in-the-blank) from the word's first example that has a
+// highlighted target word. Returns null if no usable example.
+function getCloze(word: Word) {
+  const ex = word.lemma?.examples.find((e) => e.targetOffsets.length === 2)
+  if (!ex) return null
+  const [a, b] = ex.targetOffsets
+  return {
+    before: ex.sourceText.slice(0, a),
+    answer: ex.sourceText.slice(a, b),
+    after: ex.sourceText.slice(b),
+    translation: ex.targetText,
+  }
+}
+
 function QuizSessionInner() {
   const searchParams = useSearchParams()
   const mode = (searchParams.get("mode") ?? "random_30") as QuizMode
   const languageId = searchParams.get("lang") ?? undefined
+  const style: "words" | "sentences" = searchParams.get("style") === "sentences" ? "sentences" : "words"
 
   const [gameState, setGameState] = useState<GameState>("loading")
   const [words, setWords] = useState<Word[]>([])
@@ -59,10 +74,10 @@ function QuizSessionInner() {
 
   const loadWords = useCallback(async () => {
     setGameState("loading")
-    const fetched = await getQuizWords(mode, languageId)
+    const fetched = await getQuizWords(mode, languageId, style)
     setWords(fetched)
     setGameState(fetched.length > 0 ? "playing" : "done")
-  }, [mode, languageId])
+  }, [mode, languageId, style])
 
   useEffect(() => {
     loadWords()
@@ -76,9 +91,16 @@ function QuizSessionInner() {
 
   const currentWord = words[currentIndex]
   const totalWords = words.length
+  const cloze = style === "sentences" && currentWord ? getCloze(currentWord) : null
+  const useCloze = cloze !== null
 
   function checkAnswer(input: string, word: Word): boolean {
-    return input.trim().toLowerCase() === word.translation.trim().toLowerCase()
+    const v = input.trim().toLowerCase()
+    if (useCloze && cloze) {
+      // Accept the exact inflected form in the sentence, or the headword.
+      return v === cloze.answer.toLowerCase() || v === word.word.toLowerCase()
+    }
+    return v === word.translation.trim().toLowerCase()
   }
 
   function handleSubmit() {
@@ -184,7 +206,7 @@ function QuizSessionInner() {
           There are no words available for <strong>{MODE_LABELS[mode]}</strong>. Try a different mode or add more words to your vocabulary.
         </p>
         <div className="flex gap-3 justify-center flex-wrap">
-          <Button className="gap-1.5" nativeButton={false} render={<Link href={languageId ? `/quiz?lang=${languageId}` : "/quiz"} />}>
+          <Button className="gap-1.5" nativeButton={false} render={<Link href={`/quiz?style=${style}${languageId ? `&lang=${languageId}` : ""}`} />}>
             <ArrowLeft size={14} strokeWidth={2} /> Choose another mode
           </Button>
           <Button variant="secondary" nativeButton={false} render={<Link href="/vocabulary" />}>Add words</Button>
@@ -268,7 +290,7 @@ function QuizSessionInner() {
           size="sm"
           className="gap-1 text-[0.82rem]"
           nativeButton={false}
-          render={<Link href={languageId ? `/quiz?lang=${languageId}` : "/quiz"} />}
+          render={<Link href={`/quiz?style=${style}${languageId ? `&lang=${languageId}` : ""}`} />}
         >
           <ArrowLeft size={14} strokeWidth={2} /> {MODE_LABELS[mode]}
         </Button>
@@ -312,10 +334,28 @@ function QuizSessionInner() {
           </div>
         )}
 
-        <p className="text-[0.82rem] text-text-muted mb-2">Translate this word</p>
-        <div className={`font-display text-[clamp(2rem,6vw,2.8rem)] font-bold text-text leading-[1.2] ${submitted ? "mb-4" : "mb-6"}`}>
-          {currentWord.word}
-        </div>
+        {useCloze && cloze ? (
+          <>
+            <p className="text-[0.82rem] text-text-muted mb-3">Fill in the blank</p>
+            <div className="font-display text-[clamp(1.3rem,3.5vw,1.7rem)] font-bold text-text leading-[1.5] mb-3">
+              {cloze.before}
+              {submitted ? (
+                <mark className="bg-primary-subtle text-primary rounded-sm px-1 mx-0.5">{cloze.answer}</mark>
+              ) : (
+                <span className="text-primary tracking-widest font-black mx-0.5">_____</span>
+              )}
+              {cloze.after}
+            </div>
+            <p className={`text-[0.95rem] text-text-secondary ${submitted ? "mb-3" : "mb-6"}`}>{cloze.translation}</p>
+          </>
+        ) : (
+          <>
+            <p className="text-[0.82rem] text-text-muted mb-2">Translate this word</p>
+            <div className={`font-display text-[clamp(2rem,6vw,2.8rem)] font-bold text-text leading-[1.2] ${submitted ? "mb-4" : "mb-6"}`}>
+              {currentWord.word}
+            </div>
+          </>
+        )}
 
         {submitted && (
           <div className="animate-fade-in">
@@ -323,7 +363,7 @@ function QuizSessionInner() {
               {isCorrectAnswer ? "Correct!" : "The answer was"}
             </p>
             <p className={`text-[1.2rem] font-bold ${isCorrectAnswer ? "text-success" : "text-error"}`}>
-              {currentWord.translation}
+              {useCloze && cloze ? cloze.answer : currentWord.translation}
             </p>
             {!isCorrectAnswer && userInput && (
               <p className="text-[0.85rem] text-text-muted mt-1">
@@ -338,7 +378,7 @@ function QuizSessionInner() {
             <input
               ref={inputRef}
               className="input text-center text-[1.05rem]"
-              placeholder="Type the translation…"
+              placeholder={useCloze ? "Type the missing word…" : "Type the translation…"}
               value={userInput}
               onChange={(e) => setUserInput(e.target.value)}
               onKeyDown={handleKeyDown}

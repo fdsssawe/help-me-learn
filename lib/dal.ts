@@ -19,6 +19,10 @@ export const getCurrentUser = cache(async () => {
   const authUser = await getAuthUser()
   if (!authUser) return null
 
+  // Hot path: a single read. Only the first-ever request for a user writes.
+  const existing = await prisma.user.findUnique({ where: { id: authUser.id } })
+  if (existing) return existing
+
   const meta = authUser.user_metadata ?? {}
   const name =
     (meta.name as string | undefined) ??
@@ -28,7 +32,7 @@ export const getCurrentUser = cache(async () => {
 
   return prisma.user.upsert({
     where: { id: authUser.id },
-    update: {}, // never clobber profile fields on a normal page load
+    update: {}, // race-safe if two first-requests land together
     create: {
       id: authUser.id,
       email: authUser.email ?? null,
