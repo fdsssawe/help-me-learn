@@ -1,0 +1,131 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../app/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// Profile row, keyed by the Supabase Auth user UID (auth.users.id).
+// Created on first authenticated request (see lib/dal.ts). Supabase Auth owns
+// credentials/sessions/OAuth — there are no NextAuth Account/Session tables here.
+model User {
+  id            String        @id // = Supabase auth UID
+  email         String?       @unique
+  name          String?
+  image         String?
+  plan          String        @default("free") // free | pro (Phase 4 paywall)
+  xp            Int           @default(0)
+  streak        Int           @default(0)
+  bestStreak    Int           @default(0)
+  lastStudiedAt DateTime?
+  badges        String        @default("[]")
+  quizCount     Int           @default(0)
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+  words         Word[]
+  quizSessions  QuizSession[]
+  languages     Language[]
+}
+
+model Language {
+  id           String        @id @default(cuid())
+  userId       String
+  user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name         String
+  emoji        String        @default("🌍")
+  createdAt    DateTime      @default(now())
+  words        Word[]
+  quizSessions QuizSession[]
+}
+
+model Word {
+  id          String       @id @default(cuid())
+  userId      String
+  user        User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  languageId  String?
+  language    Language?    @relation(fields: [languageId], references: [id])
+  lemmaId     String?
+  lemma       Lemma?       @relation(fields: [lemmaId], references: [id])
+  word        String
+  translation String
+  notes       String?
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+  quizAnswers QuizAnswer[]
+}
+
+model QuizSession {
+  id          String       @id @default(cuid())
+  userId      String
+  user        User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  languageId  String?
+  language    Language?    @relation(fields: [languageId], references: [id])
+  mode        String
+  score       Int
+  total       Int
+  xpEarned    Int
+  completedAt DateTime     @default(now())
+  answers     QuizAnswer[]
+}
+
+model QuizAnswer {
+  id            String      @id @default(cuid())
+  quizSessionId String
+  quizSession   QuizSession @relation(fields: [quizSessionId], references: [id], onDelete: Cascade)
+  wordId        String
+  word          Word        @relation(fields: [wordId], references: [id], onDelete: Cascade)
+  isCorrect     Boolean
+  userAnswer    String
+}
+
+// ── Enrichment layer (shared, deduped dictionary) ─────────────────────────
+// Fetched once per (text, langCode) from kaikki + Tatoeba and reused by all users.
+
+model Lemma {
+  id           String        @id @default(cuid())
+  text         String // headword, e.g. "affrontare"
+  langCode     String // "it"
+  status       String        @default("pending") // pending | ready | failed
+  enrichedAt   DateTime?
+  createdAt    DateTime      @default(now())
+  senses       Sense[]
+  examples     Example[]
+  conjugations Conjugation[]
+  words        Word[]
+
+  @@unique([text, langCode])
+}
+
+model Sense {
+  id      String   @id @default(cuid())
+  lemmaId String
+  lemma   Lemma    @relation(fields: [lemmaId], references: [id], onDelete: Cascade)
+  pos     String // verb | noun | adjective | ...
+  cefr    String? // A1..C2 (not from kaikki; added later)
+  glosses String[] // English gloss strings — these ARE the translations
+  tags    String[] // e.g. ["transitive"]
+  order   Int      @default(0)
+}
+
+model Example {
+  id            String @id @default(cuid())
+  lemmaId       String
+  lemma         Lemma  @relation(fields: [lemmaId], references: [id], onDelete: Cascade)
+  sourceText    String
+  targetText    String
+  source        String @default("tatoeba")
+  difficulty    Int    @default(0) // length proxy → easy→hard ordering
+  targetOffsets Int[] // [start, end] of the target word in sourceText; empty if none
+  order         Int    @default(0)
+}
+
+model Conjugation {
+  id      String   @id @default(cuid())
+  lemmaId String
+  lemma   Lemma    @relation(fields: [lemmaId], references: [id], onDelete: Cascade)
+  form    String
+  tags    String[] // e.g. ["first-person", "present", "singular"]
+  order   Int      @default(0)
+}

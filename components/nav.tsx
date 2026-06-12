@@ -1,0 +1,92 @@
+"use client"
+
+import Link from "next/link"
+import { usePathname } from "next/navigation"
+import { useState } from "react"
+import { LayoutDashboard, BookOpen, Zap, LogOut } from "lucide-react"
+import { ThemeToggle } from "./theme-toggle"
+import { signOut } from "@/app/actions/auth"
+
+const NAV_LINKS = [
+  { href: "/dashboard", label: "Dashboard", Icon: LayoutDashboard },
+  { href: "/vocabulary", label: "Vocabulary", Icon: BookOpen },
+  { href: "/quiz", label: "Quiz", Icon: Zap },
+]
+
+type NavUser = { name: string | null; email: string | null; image: string | null }
+
+export function Nav({ user }: { user: NavUser }) {
+  const pathname = usePathname()
+  const [menuOpen, setMenuOpen] = useState(false)
+
+  const initial =
+    user.name?.[0]?.toUpperCase() ?? user.email?.[0]?.toUpperCase() ?? "?"
+  const displayName = user.name ?? user.email?.split("@")[0] ?? "Account"
+
+  return (
+    <header className="sticky top-0 z-50 bg-bg-card border-b border-border shadow-sm">
+      <div className="max-w-[1100px] mx-auto px-6 h-[60px] flex items-center justify-between gap-4">
+
+        <Link
+          href="/dashboard"
+          className="font-display text-[1.35rem] font-bold text-primary tracking-tight no-underline shrink-0"
+        >
+          LinguaFlow
+        </Link>
+
+        <nav className="flex gap-1 items-center">
+          {NAV_LINKS.map(({ href, label, Icon }) => {
+            const active = pathname.startsWith(href)
+            return (
+              <Link
+                key={href}
+                href={href}
+                className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-[var(--radius-sm)] text-[0.9rem] no-underline transition-all ${
+                  active
+                    ? "font-bold text-primary bg-primary-subtle"
+                    : "font-medium text-text-secondary hover:bg-bg-subtle hover:text-text"
+                }`}
+              >
+                <Icon size={15} strokeWidth={active ? 2.5 : 2} />
+                {label}
+              </Link>
+            )
+          })}
+        </nav>
+
+        <div className="flex items-center gap-2 shrink-0">
+          <ThemeToggle />
+
+          <div className="relative">
+            <button
+              onClick={() => setMenuOpen((v) => !v)}
+              className="flex items-center gap-2 pl-1.5 pr-2.5 py-1 rounded-[var(--radius)] bg-bg-subtle border border-border cursor-pointer transition-all"
+            >
+              <div className="w-7 h-7 rounded-full bg-primary text-primary-fg flex items-center justify-center text-[0.8rem] font-bold shrink-0">
+                {initial}
+              </div>
+              <span className="text-[0.85rem] font-semibold text-text max-w-[100px] truncate">
+                {displayName}
+              </span>
+            </button>
+
+            {menuOpen && (
+              <>
+                <div className="fixed inset-0 z-10" onClick={() => setMenuOpen(false)} />
+                <div className="card-elevated animate-pop absolute top-[calc(100%+8px)] right-0 min-w-[160px] p-1.5 z-20">
+                  <button
+                    onClick={() => { signOut(); setMenuOpen(false) }}
+                    className="w-full flex items-center gap-2 px-3 py-2 rounded-[var(--radius-sm)] border-0 bg-transparent text-error text-[0.9rem] font-semibold cursor-pointer text-left transition-colors hover:bg-error-bg"
+                  >
+                    <LogOut size={14} />
+                    Sign out
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      </div>
+    </header>
+  )
+}
