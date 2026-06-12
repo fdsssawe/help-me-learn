@@ -56,15 +56,23 @@ Enrichment pipeline: server-side only; check Lemma cache → miss → create `pe
   - NextAuth → Supabase Auth (`@supabase/ssr`), session refresh in `proxy.ts`
   - PostHog wired into root layout
   - Prisma client regenerated for Postgres
-- **Phase 1 — Enrichment MVP** 🔄 IN PROGRESS (engine verified; UI pending browser test)
+- **Phase 1 — Enrichment MVP** ✅ DONE (committed/pushed, browser-verified)
   - ✅ Schema: `Lemma/Sense/Example/Conjugation` + `Word.lemmaId` (augments, doesn't replace Word)
-  - ✅ Engine `lib/enrichment/` — language registry (`languages.ts`, Italian), `kaikki.ts`, `tatoeba.ts`, cached `enrich.ts` orchestrator. Verified end-to-end (affrontare/casa → senses/examples/conjugations, highlight via forms+stem fallback, warm-cache ~195ms). No DeepL needed (Tatoeba pre-translated).
-  - ✅ `createWord` auto-enriches + auto-fills translation from first sense + links lemma; add form translation now optional
+  - ✅ Engine `lib/enrichment/` — language registry (`languages.ts`, Italian), `kaikki.ts`, `tatoeba.ts`, cached `enrich.ts` orchestrator. Highlight via forms+stem fallback, warm-cache ~195ms. No DeepL needed (Tatoeba pre-translated).
+  - ✅ `createWord` auto-enriches + auto-fills translation from first sense + links lemma (translation input removed from add form; still editable via edit form)
   - ✅ Vocabulary rows: shadcn **Collapsible** expandable detail (`components/enriched-detail.tsx`) — meanings, highlighted examples, conjugation chips
-  - ⬜ Browser verification; optional: re-enrich on word edit; cap/lazy-load conjugations; broaden languages
-  - Note: enrichment runs **inline** in `createWord` (~2s cold, cached after). UI primitives via shadcn CLI (see memory).
-- **Phase 2 — Depth** ⬜
-  - Conjugations, CEFR, multiple senses, difficulty ordering, highlighting; broaden languages
+  - ✅ Add-word UX: shadcn **Select** (restyled) for language; **Autocomplete** (`components/ui/autocomplete.tsx`, base-ui) for the word field with debounced Wiktionary opensearch suggestions (`suggestWords` action) — dropdown only renders when suggestions exist; default language = filtered / only-one / last-used (most recent word)
+  - ✅ Add-Language popover restricted to enrichment-supported languages (driven by `LANGUAGES` registry); custom free-text removed
+  - Note: enrichment runs **inline** in `createWord` (~2s cold, cached after). Avoid shadcn's `combobox` recipe — it tries to overwrite our custom `button.tsx`; use base-ui `Autocomplete` directly. UI primitives via shadcn CLI (see memory).
+  - Deferred (optional, not blocking): re-enrich on word edit; cap/lazy-load conjugations; broaden languages
+- **Phase 2 — Target languages (EN/UK)** 🔄 mostly done (engine verified; nav picker pending browser test)
+  - ✅ Multi-target translations: `Lemma.targetLang` (cache key now `(text, langCode, targetLang)`), `User.nativeLang` (en|uk)
+  - ✅ `lib/enrichment/translate.ts` — provider-agnostic MT (MyMemory, free/no-key; swap to DeepL later by editing one file). UK meanings = MT of the English kaikki glosses; EN needs no translation
+  - ✅ Tatoeba parameterized by target ISO (`eng`/`ukr`); `TARGET_LANGUAGES` registry + `resolveTarget`
+  - ✅ Nav user-menu picker ("Translations in: English/Ukrainian") → `setNativeLang` action (`app/actions/user.ts`); `createWord` enriches to `user.nativeLang`
+  - ✅ Verified it→uk (Ukrainian meanings + Ukrainian Tatoeba examples) AND it→en coexist as separate cached lemmas
+  - ✅ Source languages: **Italian + Spanish** (registry-driven — adding one = a single `LANGUAGES` entry; verified kaikki/Tatoeba/`<code>.wiktionary` coverage). Engine is fully language-agnostic.
+  - ⬜ Deferred: re-enrich existing words when native lang changes (today switching only affects NEW words — old words keep their original-target lemma); CEFR; smarter conjugation grouping; filter kaikki "inflection of" form-senses; more source languages
 - **Phase 3 — Cloze quizzes** ⬜
   - Quizzes from stored examples (reuses existing XP/streak/badge engine)
 - **Phase 4 — Paywall** ⬜
@@ -114,6 +122,6 @@ Enrichment pipeline: server-side only; check Lemma cache → miss → create `pe
 
 ## Working conventions
 
-- **Work on `main` only — no version control / commits for now** (per user, current preference).
+- **Work on `main`** — user commits & pushes directly (don't open branches/PRs unless asked).
 - Read `node_modules/next/dist/docs/` before writing framework code (Next here is non-standard).
-- Throwaway spike lives in `scripts/spike-enrichment.mjs` (+ `SPIKE-NOTES.md`) — delete once Phase 1 absorbs it.
+- Enrichment logic now lives in `lib/enrichment/`; the throwaway spike (`scripts/spike-enrichment.mjs` + `SPIKE-NOTES.md`) is superseded and can be deleted.

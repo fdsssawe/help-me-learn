@@ -1,9 +1,10 @@
 import "server-only"
 import type { Prisma } from "@/app/generated/prisma/client"
 import { prisma } from "@/lib/prisma"
-import { resolveLanguage } from "./languages"
+import { resolveLanguage, resolveTarget, type TargetLang } from "./languages"
 import { fetchKaikki, type KaikkiEntry, type KaikkiForm } from "./kaikki"
-import { fetchTatoeba, firstEnglish } from "./tatoeba"
+import { fetchTatoeba, translationInLang } from "./tatoeba"
+import { translateText } from "./translate"
 
 const MAX_EXAMPLES = 6
 const MIN_SENTENCE_LEN = 6
@@ -16,10 +17,12 @@ const LEMMA_INCLUDE = {
 
 export type EnrichedLemma = Prisma.LemmaGetPayload<{ include: typeof LEMMA_INCLUDE }>
 
+type RawSense = { pos: string; glosses: string[]; tags: string[]; order: number }
+
 // ── normalization helpers ──────────────────────────────────────────────────
 
-function normalizeSenses(entries: KaikkiEntry[]) {
-  const senses: { pos: string; glosses: string[]; tags: string[]; order: number }[] = []
+function normalizeSenses(entries: KaikkiEntry[]): RawSense[] {
+  const senses: RawSense[] = []
   let order = 0
   for (const entry of entries) {
     const pos = entry.pos ?? "unknown"
@@ -32,6 +35,20 @@ function normalizeSenses(entries: KaikkiEntry[]) {
   return senses
 }
 
+// kaikki glosses are English. For non-English targets, translate each gloss,
+// falling back to the English gloss when translation fails.
+async function translateSenses(senses: RawSense[], target: TargetLang): Promise<RawSense[]> {
+  if (!target.needsTranslation) return senses
+  return Promise.all(
+    senses.map(async (s) => {
+      const glosses = await Promise.all(
+        s.glosses.map(async (g) => (await translateText(g, "en", target.code)) ?? g)
+      )
+      return { ...s, glosses }
+    })
+  )
+}
+
 function normalizeConjugations(entries: KaikkiEntry[]) {
   const out: { form: string; tags: string[]; order: number }[] = []
   const seen = new Set<string>()
@@ -41,7 +58,6 @@ function normalizeConjugations(entries: KaikkiEntry[]) {
       const form = f.form?.trim()
       const tags = f.tags ?? []
       if (!form || form === "-") continue
-      // Drop kaikki's table/template scaffolding rows.
       if (tags.includes("table-tags") || tags.includes("inflection-template")) continue
       const key = `${form}|${tags.join(",")}`
       if (seen.has(key)) continue
@@ -58,9 +74,6 @@ function buildFormSet(headword: string, forms: KaikkiForm[]) {
   return set
 }
 
-// Highlight the target word: prefer an exact inflected-form match (from kaikki's
-// forms set), then fall back to a stem prefix (catches clitic forms like
-// "affrontarla" that aren't in the forms table).
 function findOffsets(sentence: string, formSet: Set<string>, stem: string): number[] {
   const re = /\p{L}+/gu
   let m: RegExpExecArray | null
@@ -77,7 +90,8 @@ function findOffsets(sentence: string, formSet: Set<string>, stem: string): numb
 function normalizeExamples(
   results: Awaited<ReturnType<typeof fetchTatoeba>>,
   headword: string,
-  forms: KaikkiForm[]
+  forms: KaikkiForm[],
+  targetTatoeba: string
 ) {
   const formSet = buildFormSet(headword, forms)
   const stem = headword.slice(0, Math.max(4, headword.length - 3)).toLowerCase()
@@ -90,20 +104,19 @@ function normalizeExamples(
   }[] = []
 
   for (const r of results) {
-    const en = firstEnglish(r.translations)
-    if (!en || !r.text || r.text.length < MIN_SENTENCE_LEN) continue
-    const key = en.trim().toLowerCase()
+    const translated = translationInLang(r.translations, targetTatoeba)
+    if (!translated || !r.text || r.text.length < MIN_SENTENCE_LEN) continue
+    const key = translated.trim().toLowerCase()
     if (seen.has(key)) continue
     seen.add(key)
     candidates.push({
       sourceText: r.text,
-      targetText: en,
+      targetText: translated,
       difficulty: r.text.length,
       targetOffsets: findOffsets(r.text, formSet, stem),
     })
   }
 
-  // Examples that actually highlight the word first, then easy → hard.
   candidates.sort((a, b) => {
     const ah = a.targetOffsets.length ? 0 : 1
     const bh = b.targetOffsets.length ? 0 : 1
@@ -115,18 +128,23 @@ function normalizeExamples(
 
 // ── orchestrator ───────────────────────────────────────────────────────────
 
-// Enrich (text, language) into the shared Lemma cache. Returns the enriched lemma,
-// or null if the language is unsupported or enrichment found nothing.
+// Enrich (text, source language) for a translation target. Cached per
+// (text, langCode, targetLang). Returns null if the language is unsupported
+// or enrichment found no senses.
 export async function enrichLemma(
   rawText: string,
-  language: string
+  language: string,
+  targetCode: string
 ): Promise<EnrichedLemma | null> {
   const adapter = resolveLanguage(language)
   if (!adapter) return null
+  const target = resolveTarget(targetCode)
   const text = rawText.trim().toLowerCase()
   if (!text) return null
 
-  const key = { text_langCode: { text, langCode: adapter.code } }
+  const key = {
+    text_langCode_targetLang: { text, langCode: adapter.code, targetLang: target.code },
+  }
 
   const cached = await prisma.lemma.findUnique({ where: key, include: LEMMA_INCLUDE })
   if (cached?.status === "ready") return cached
@@ -134,18 +152,18 @@ export async function enrichLemma(
   const lemma = await prisma.lemma.upsert({
     where: key,
     update: { status: "pending" },
-    create: { text, langCode: adapter.code, status: "pending" },
+    create: { text, langCode: adapter.code, targetLang: target.code, status: "pending" },
   })
 
   try {
     const [entries, tatoeba] = await Promise.all([
       fetchKaikki(text, adapter.kaikki),
-      fetchTatoeba(text, adapter.tatoeba),
+      fetchTatoeba(text, adapter.tatoeba, target.tatoeba),
     ])
     const forms = entries.flatMap((e) => e.forms ?? [])
-    const senses = normalizeSenses(entries)
+    const senses = await translateSenses(normalizeSenses(entries), target)
     const conjugations = normalizeConjugations(entries)
-    const examples = normalizeExamples(tatoeba, text, forms)
+    const examples = normalizeExamples(tatoeba, text, forms, target.tatoeba)
 
     await prisma.$transaction([
       prisma.sense.deleteMany({ where: { lemmaId: lemma.id } }),

@@ -6,6 +6,8 @@ import { useState } from "react"
 import { LayoutDashboard, BookOpen, Zap, LogOut } from "lucide-react"
 import { ThemeToggle } from "./theme-toggle"
 import { signOut } from "@/app/actions/auth"
+import { setNativeLang } from "@/app/actions/user"
+import { TARGET_LANGUAGES } from "@/lib/enrichment/languages"
 
 const NAV_LINKS = [
   { href: "/dashboard", label: "Dashboard", Icon: LayoutDashboard },
@@ -13,7 +15,7 @@ const NAV_LINKS = [
   { href: "/quiz", label: "Quiz", Icon: Zap },
 ]
 
-type NavUser = { name: string | null; email: string | null; image: string | null }
+type NavUser = { name: string | null; email: string | null; image: string | null; nativeLang: string }
 
 export function Nav({ user }: { user: NavUser }) {
   const pathname = usePathname()
@@ -73,7 +75,29 @@ export function Nav({ user }: { user: NavUser }) {
             {menuOpen && (
               <>
                 <div className="fixed inset-0 z-10" onClick={() => setMenuOpen(false)} />
-                <div className="card-elevated animate-pop absolute top-[calc(100%+8px)] right-0 min-w-[160px] p-1.5 z-20">
+                <div className="card-elevated animate-pop absolute top-[calc(100%+8px)] right-0 min-w-[200px] p-1.5 z-20">
+                  <div className="px-3 pt-2 pb-1">
+                    <p className="text-[0.68rem] font-bold uppercase tracking-[0.06em] text-text-muted mb-1.5">Translations in</p>
+                    <div className="flex gap-1">
+                      {TARGET_LANGUAGES.map((t) => {
+                        const active = t.code === user.nativeLang
+                        return (
+                          <button
+                            key={t.code}
+                            onClick={() => setNativeLang(t.code)}
+                            className={`flex-1 px-2 py-1 rounded-[var(--radius-sm)] text-[0.82rem] font-semibold border cursor-pointer transition-colors ${
+                              active
+                                ? "bg-primary-subtle border-primary text-primary"
+                                : "bg-bg-subtle border-border text-text-secondary hover:bg-bg-hover"
+                            }`}
+                          >
+                            {t.label}
+                          </button>
+                        )
+                      })}
+                    </div>
+                  </div>
+                  <div className="h-px bg-border my-1.5" />
                   <button
                     onClick={() => { signOut(); setMenuOpen(false) }}
                     className="w-full flex items-center gap-2 px-3 py-2 rounded-[var(--radius-sm)] border-0 bg-transparent text-error text-[0.9rem] font-semibold cursor-pointer text-left transition-colors hover:bg-error-bg"

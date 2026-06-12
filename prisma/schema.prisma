@@ -16,6 +16,7 @@ model User {
   name          String?
   image         String?
   plan          String        @default("free") // free | pro (Phase 4 paywall)
+  nativeLang    String        @default("en") // translation/display target (en | uk | …)
   xp            Int           @default(0)
   streak        Int           @default(0)
   bestStreak    Int           @default(0)
@@ -86,7 +87,8 @@ model QuizAnswer {
 model Lemma {
   id           String        @id @default(cuid())
   text         String // headword, e.g. "affrontare"
-  langCode     String // "it"
+  langCode     String // source language, "it"
+  targetLang   String        @default("en") // meanings/examples language, "en" | "uk"
   status       String        @default("pending") // pending | ready | failed
   enrichedAt   DateTime?
   createdAt    DateTime      @default(now())
@@ -95,7 +97,7 @@ model Lemma {
   conjugations Conjugation[]
   words        Word[]
 
-  @@unique([text, langCode])
+  @@unique([text, langCode, targetLang])
 }
 
 model Sense {

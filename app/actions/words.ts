@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache"
 import { prisma } from "@/lib/prisma"
-import { getAuthUser, requireUserId as requireUser } from "@/lib/dal"
+import { getAuthUser, getCurrentUser, requireUserId as requireUser } from "@/lib/dal"
 import { enrichLemma } from "@/lib/enrichment/enrich"
 import { resolveLanguage } from "@/lib/enrichment/languages"
 
@@ -52,7 +52,9 @@ export async function createWord(data: {
   notes?: string
   languageId?: string
 }) {
-  const userId = await requireUser()
+  const user = await getCurrentUser()
+  if (!user) throw new Error("Unauthorized")
+  const userId = user.id
   const word = data.word.trim()
   let translation = data.translation?.trim() ?? ""
   let lemmaId: string | undefined
@@ -65,7 +67,7 @@ export async function createWord(data: {
       select: { name: true },
     })
     if (lang) {
-      const lemma = await enrichLemma(word, lang.name)
+      const lemma = await enrichLemma(word, lang.name, user.nativeLang)
       if (lemma) {
         lemmaId = lemma.id
         if (!translation && lemma.senses[0]) translation = lemma.senses[0].glosses.join(", ")
