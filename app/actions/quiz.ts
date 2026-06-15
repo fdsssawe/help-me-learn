@@ -17,10 +17,23 @@ export async function getQuizWords(
 ) {
   const userId = await requireUser()
   const now = new Date()
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { nativeLang: true },
+  })
+  const nativeLang = user?.nativeLang ?? "en"
+
   const base: Prisma.WordWhereInput = { userId }
   if (languageId) base.languageId = languageId
-  // Sentences (cloze) only works for words that have example sentences.
-  if (style === "sentences") base.lemma = { examples: { some: {} } }
+  // Only quiz words enriched for the user's current native language (en/uk) —
+  // otherwise hints/translations would be in the wrong language.
+  if (style === "sentences") {
+    // Cloze needs example sentences, which live on the (native-matched) lemma.
+    base.lemma = { targetLang: nativeLang, examples: { some: {} } }
+  } else {
+    // Words style: native-matched lemmas, plus un-enriched words (manual translation).
+    base.OR = [{ lemma: { targetLang: nativeLang } }, { lemmaId: null }]
+  }
 
   const include = {
     lemma: { include: { examples: { orderBy: { order: "asc" as const } } } },

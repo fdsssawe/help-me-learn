@@ -3,10 +3,12 @@
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { useState } from "react"
-import { LayoutDashboard, BookOpen, Zap, LogOut } from "lucide-react"
+import { LayoutDashboard, BookOpen, Zap, LogOut, Sparkles } from "lucide-react"
+import { toast } from "sonner"
 import { ThemeToggle } from "./theme-toggle"
 import { signOut } from "@/app/actions/auth"
 import { setNativeLang } from "@/app/actions/user"
+import { getCheckoutUrl } from "@/app/actions/billing"
 import { TARGET_LANGUAGES } from "@/lib/enrichment/languages"
 
 const NAV_LINKS = [
@@ -15,11 +17,20 @@ const NAV_LINKS = [
   { href: "/quiz", label: "Quiz", Icon: Zap },
 ]
 
-type NavUser = { name: string | null; email: string | null; image: string | null; nativeLang: string }
+type NavUser = { name: string | null; email: string | null; image: string | null; nativeLang: string; plan: string }
 
 export function Nav({ user }: { user: NavUser }) {
   const pathname = usePathname()
   const [menuOpen, setMenuOpen] = useState(false)
+
+  async function handleUpgrade() {
+    setMenuOpen(false)
+    try {
+      window.location.href = await getCheckoutUrl()
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Couldn't start checkout.")
+    }
+  }
 
   const initial =
     user.name?.[0]?.toUpperCase() ?? user.email?.[0]?.toUpperCase() ?? "?"
@@ -97,6 +108,21 @@ export function Nav({ user }: { user: NavUser }) {
                       })}
                     </div>
                   </div>
+                  <div className="h-px bg-border my-1.5" />
+                  {user.plan === "free" ? (
+                    <button
+                      onClick={handleUpgrade}
+                      className="w-full flex items-center gap-2 px-3 py-2 rounded-[var(--radius-sm)] border-0 bg-transparent text-primary text-[0.9rem] font-semibold cursor-pointer text-left transition-colors hover:bg-primary-subtle"
+                    >
+                      <Sparkles size={14} />
+                      Upgrade to Pro
+                    </button>
+                  ) : (
+                    <div className="w-full flex items-center gap-2 px-3 py-2 text-[0.9rem] font-semibold text-primary">
+                      <Sparkles size={14} />
+                      Pro plan
+                    </div>
+                  )}
                   <div className="h-px bg-border my-1.5" />
                   <button
                     onClick={() => { signOut(); setMenuOpen(false) }}

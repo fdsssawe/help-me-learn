@@ -18,9 +18,8 @@ export default async function QuizPage({
   const { lang, style: styleParam } = await searchParams
   const style: "words" | "sentences" = styleParam === "sentences" ? "sentences" : "words"
   const user = await getCurrentUser()
-  const userId = user?.id
 
-  if (!userId) {
+  if (!user) {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
         <div className="card p-8 text-center max-w-[400px]">
@@ -32,9 +31,17 @@ export default async function QuizPage({
 
   const now = new Date()
   const yesterday = subDays(now, 1)
+  // Mirror getQuizWords' filtering so the mode-card counts match what the quiz
+  // will actually serve: only words for the current native language (en/uk).
+  const nativeLang = user.nativeLang
+  const userId = user.id
   const base: Prisma.WordWhereInput = { userId }
   if (lang) base.languageId = lang
-  if (style === "sentences") base.lemma = { examples: { some: {} } }
+  if (style === "sentences") {
+    base.lemma = { targetLang: nativeLang, examples: { some: {} } }
+  } else {
+    base.OR = [{ lemma: { targetLang: nativeLang } }, { lemmaId: null }]
+  }
 
   const [yesterdayCount, weekCount, totalCount, languages] = await Promise.all([
     prisma.word.count({ where: { ...base, createdAt: { gte: startOfDay(yesterday), lte: endOfDay(yesterday) } } }),

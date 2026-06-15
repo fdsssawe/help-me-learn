@@ -8,7 +8,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
 
   return (
     <div style={{ minHeight: "100dvh", display: "flex", flexDirection: "column", background: "var(--bg)" }}>
-      <Nav user={{ name: user.name, email: user.email, image: user.image, nativeLang: user.nativeLang }} />
+      <Nav user={{ name: user.name, email: user.email, image: user.image, nativeLang: user.nativeLang, plan: user.plan }} />
       <main style={{ flex: 1, maxWidth: 1100, margin: "0 auto", width: "100%", padding: "32px 24px 64px" }}>
         {children}
       </main>
