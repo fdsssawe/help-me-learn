@@ -13,7 +13,7 @@ import { Autocomplete, AutocompleteInput, AutocompleteContent, AutocompleteItem 
 import { EnrichedDetail } from "@/components/enriched-detail"
 import { resolveLanguage } from "@/lib/enrichment/languages"
 import { getCheckoutUrl } from "@/app/actions/billing"
-import { FREE_WORD_LIMIT } from "@/lib/billing"
+import { FREE_WORD_LIMIT, WORD_LIMIT_NUDGE_AT } from "@/lib/billing"
 import { toast } from "sonner"
 
 const NO_LANG = "__none__"
@@ -194,7 +194,7 @@ export function VocabularyClient({ words, languages, activeLangId, plan, totalWo
             {words.length} {words.length === 1 ? "word" : "words"}
             {activeLang ? ` in ${activeLang.name}` : " across all languages"}
           </p>
-          {plan === "free" && (
+          {plan === "free" && totalWords >= WORD_LIMIT_NUDGE_AT && (
             <p className={`text-[0.78rem] mt-0.5 ${atLimit ? "text-error font-semibold" : "text-text-muted"}`}>
               {totalWords} / {FREE_WORD_LIMIT} words on the free plan{atLimit ? " — limit reached" : ""}
             </p>

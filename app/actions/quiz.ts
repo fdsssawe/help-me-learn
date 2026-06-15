@@ -69,7 +69,26 @@ export async function saveQuizSession(data: {
   const user = await prisma.user.findUnique({ where: { id: userId } })
   if (!user) throw new Error("User not found")
 
-  const xpEarned = data.score * XP_PER_CORRECT + XP_QUIZ_COMPLETION_BONUS
+  // Anti-farm: award XP only for words gotten right for the FIRST time today.
+  // Replaying the same quiz then earns nothing. (Run before inserting this
+  // session so we only see prior sessions.)
+  const correctWordIds = [...new Set(data.answers.filter((a) => a.isCorrect).map((a) => a.wordId))]
+  const startToday = startOfDay(new Date())
+  const priorCorrect = correctWordIds.length
+    ? await prisma.quizAnswer.findMany({
+        where: {
+          isCorrect: true,
+          wordId: { in: correctWordIds },
+          quizSession: { userId, completedAt: { gte: startToday } },
+        },
+        select: { wordId: true },
+      })
+    : []
+  const alreadyCounted = new Set(priorCorrect.map((a) => a.wordId))
+  const newCorrect = correctWordIds.filter((id) => !alreadyCounted.has(id))
+  const xpEarned =
+    newCorrect.length * XP_PER_CORRECT +
+    (newCorrect.length > 0 ? XP_QUIZ_COMPLETION_BONUS : 0)
 
   const session = await prisma.quizSession.create({
     data: {

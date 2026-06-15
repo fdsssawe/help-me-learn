@@ -8,15 +8,17 @@ import { getLanguages } from "@/app/actions/languages"
 import { LanguageSelector } from "@/components/language-selector"
 import { Button } from "@/components/ui/button"
 import { StyleToggle } from "./style-toggle"
+import { DirectionToggle } from "./direction-toggle"
 import { subDays, startOfDay, endOfDay } from "date-fns"
 
 export default async function QuizPage({
   searchParams,
 }: {
-  searchParams: Promise<{ lang?: string; style?: string }>
+  searchParams: Promise<{ lang?: string; style?: string; dir?: string }>
 }) {
-  const { lang, style: styleParam } = await searchParams
+  const { lang, style: styleParam, dir: dirParam } = await searchParams
   const style: "words" | "sentences" = styleParam === "sentences" ? "sentences" : "words"
+  const dir: "forward" | "reverse" = dirParam === "reverse" ? "reverse" : "forward"
   const user = await getCurrentUser()
 
   if (!user) {
@@ -52,18 +54,22 @@ export default async function QuizPage({
 
   const activeLang = languages.find((l) => l.id === lang)
   const langParam = lang ? `&lang=${lang}` : ""
+  // Reverse direction only applies to the Words style.
+  const dirParamStr = dir === "reverse" && style === "words" ? "&dir=reverse" : ""
+  const params = `&style=${style}${langParam}${dirParamStr}`
 
   const modes = [
-    { key: "last_lesson", Icon: BookOpen, label: "Last Lesson", description: "Review what you learned in your last study session", count: yesterdayCount, countLabel: "words from yesterday", href: `/quiz/session?mode=last_lesson&style=${style}${langParam}` },
-    { key: "last_week", Icon: Calendar, label: "Last Week", description: "Reinforce everything from this week", count: weekCount, countLabel: "words this week", href: `/quiz/session?mode=last_week&style=${style}${langParam}` },
-    { key: "random_30", Icon: Shuffle, label: "Random 30", description: "A surprise mix from your whole vocabulary", count: totalCount, countLabel: "words total", href: `/quiz/session?mode=random_30&style=${style}${langParam}` },
+    { key: "last_lesson", Icon: BookOpen, label: "Last Lesson", description: "Review what you learned in your last study session", count: yesterdayCount, countLabel: "words from yesterday", href: `/quiz/session?mode=last_lesson${params}` },
+    { key: "last_week", Icon: Calendar, label: "Last Week", description: "Reinforce everything from this week", count: weekCount, countLabel: "words this week", href: `/quiz/session?mode=last_week${params}` },
+    { key: "random_30", Icon: Shuffle, label: "Random 30", description: "A surprise mix from your whole vocabulary", count: totalCount, countLabel: "words total", href: `/quiz/session?mode=random_30${params}` },
   ]
 
   return (
     <div className="animate-fade-in max-w-3xl mx-auto px-4 py-8">
       <PageTitle activeLang={activeLang} />
       <LanguageSelector languages={languages} activeLangId={lang} basePath="/quiz" />
-      <StyleToggle style={style} lang={lang} />
+      <StyleToggle style={style} lang={lang} dir={dir} />
+      {style === "words" && <DirectionToggle dir={dir} style={style} lang={lang} />}
 
       {totalCount === 0 ? (
         <div className="py-14 text-center">

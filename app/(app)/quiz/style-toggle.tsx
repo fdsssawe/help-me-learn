@@ -4,14 +4,16 @@ import { useRouter } from "next/navigation"
 import { useTransition } from "react"
 import { Switch } from "@/components/ui/switch"
 
-export function StyleToggle({ style, lang }: { style: "words" | "sentences"; lang?: string }) {
+export function StyleToggle({ style, lang, dir }: { style: "words" | "sentences"; lang?: string; dir?: "forward" | "reverse" }) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
   const isSentences = style === "sentences"
 
   function onChange(next: boolean) {
     startTransition(() => {
-      router.push(`/quiz?style=${next ? "sentences" : "words"}${lang ? `&lang=${lang}` : ""}`)
+      // Reverse direction only applies to Words style; drop it when switching to Sentences.
+      const dirParam = !next && dir === "reverse" ? "&dir=reverse" : ""
+      router.push(`/quiz?style=${next ? "sentences" : "words"}${lang ? `&lang=${lang}` : ""}${dirParam}`)
     })
   }
 

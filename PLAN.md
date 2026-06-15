@@ -104,6 +104,12 @@ Enrichment pipeline: server-side only; check Lemma cache → miss → create `pe
   - Why: Polar ruled out (Ukraine not on its Stripe-Connect payout list); Paddle supports Ukrainian individuals/sole traders (no incorporation).
   - Plan: provider-neutral schema columns (`billingCustomerId`/`billingSubscriptionId`); Paddle.js overlay checkout (`NEXT_PUBLIC_PADDLE_CLIENT_TOKEN` + `NEXT_PUBLIC_PADDLE_PRICE_ID` + `customData.user_id`); `app/api/webhooks/paddle/route.ts` (verify `Paddle-Signature`); env swap LS→Paddle; sandbox test first.
 
+- **Phase 8 — Quiz UX polish + XP anti-farm** ✅ DONE (pushed)
+  - ✅ Lenient answer matching (`lib/quiz-match.ts` — `answerMatches`/`normalizeAnswer`): accepts any comma/`/`/`;`/"or" alternative, ignores leading "to ", parentheticals, case, trailing punctuation. Used in `session/page.tsx` `checkAnswer` (cloze too).
+  - ✅ Quiz **direction toggle** (Words style only) — `?dir=forward|reverse` via `direction-toggle.tsx` (mirrors `style-toggle.tsx`); reverse shows the translation and accepts the source word. Threaded through `/quiz` mode links, `StyleToggle`, and the session back-link.
+  - ✅ Paywall counter hidden until `WORD_LIMIT_NUDGE_AT = 100` words (`lib/billing.ts`, `vocabulary-client.tsx`); 200 cap + upgrade card unchanged.
+  - ✅ XP anti-farm: `saveQuizSession` awards XP only for words correct for the **first time today** (queries prior same-day correct `QuizAnswer`s via `QuizSession.completedAt`); completion bonus only if ≥1 new-correct word. Replays earn 0 (+ a muted "no XP" note on results). Streak/badges/quizCount unchanged.
+
 ## Current tech stack (post-Phase 0)
 
 - Next.js 16.2.4 (Turbopack) + TypeScript + Tailwind v4 + React 19

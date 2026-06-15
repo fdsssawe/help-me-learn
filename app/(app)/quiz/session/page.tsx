@@ -6,6 +6,7 @@ import Link from "next/link"
 import { ArrowLeft, ArrowRight, Check, X, Trophy, Award, BookOpen, BookX } from "lucide-react"
 import { getQuizWords, saveQuizSession } from "@/app/actions/quiz"
 import { BADGE_DISPLAY } from "@/lib/badge-display"
+import { answerMatches, normalizeAnswer } from "@/lib/quiz-match"
 import { Button } from "@/components/ui/button"
 
 type QuizMode = "last_lesson" | "last_week" | "random_30"
@@ -58,6 +59,9 @@ function QuizSessionInner() {
   const mode = (searchParams.get("mode") ?? "random_30") as QuizMode
   const languageId = searchParams.get("lang") ?? undefined
   const style: "words" | "sentences" = searchParams.get("style") === "sentences" ? "sentences" : "words"
+  // Reverse (show translation → type the word) applies to Words style only.
+  const reverse = style === "words" && searchParams.get("dir") === "reverse"
+  const backHref = `/quiz?style=${style}${languageId ? `&lang=${languageId}` : ""}${reverse ? "&dir=reverse" : ""}`
 
   const [gameState, setGameState] = useState<GameState>("loading")
   const [words, setWords] = useState<Word[]>([])
@@ -95,12 +99,13 @@ function QuizSessionInner() {
   const useCloze = cloze !== null
 
   function checkAnswer(input: string, word: Word): boolean {
-    const v = input.trim().toLowerCase()
     if (useCloze && cloze) {
       // Accept the exact inflected form in the sentence, or the headword.
-      return v === cloze.answer.toLowerCase() || v === word.word.toLowerCase()
+      const v = normalizeAnswer(input)
+      return v === normalizeAnswer(cloze.answer) || v === normalizeAnswer(word.word)
     }
-    return v === word.translation.trim().toLowerCase()
+    // Reverse: prompt is the translation, expected answer is the source word.
+    return reverse ? answerMatches(input, word.word) : answerMatches(input, word.translation)
   }
 
   function handleSubmit() {
@@ -206,7 +211,7 @@ function QuizSessionInner() {
           There are no words available for <strong>{MODE_LABELS[mode]}</strong>. Try a different mode or add more words to your vocabulary.
         </p>
         <div className="flex gap-3 justify-center flex-wrap">
-          <Button className="gap-1.5" nativeButton={false} render={<Link href={`/quiz?style=${style}${languageId ? `&lang=${languageId}` : ""}`} />}>
+          <Button className="gap-1.5" nativeButton={false} render={<Link href={backHref} />}>
             <ArrowLeft size={14} strokeWidth={2} /> Choose another mode
           </Button>
           <Button variant="secondary" nativeButton={false} render={<Link href="/vocabulary" />}>Add words</Button>
@@ -236,6 +241,11 @@ function QuizSessionInner() {
           <div className="animate-pop inline-flex items-center gap-1.5 bg-xp-bg text-xp mt-2 px-4 py-1.5 rounded-full font-bold text-base">
             +{results.xpEarned} XP
           </div>
+          {results.score > 0 && results.xpEarned === 0 && (
+            <p className="text-[0.82rem] text-text-muted mt-3">
+              No XP this time — you&apos;d already reviewed these words today.
+            </p>
+          )}
         </div>
 
         {results.newBadges.length > 0 && (
@@ -290,7 +300,7 @@ function QuizSessionInner() {
           size="sm"
           className="gap-1 text-[0.82rem]"
           nativeButton={false}
-          render={<Link href={`/quiz?style=${style}${languageId ? `&lang=${languageId}` : ""}`} />}
+          render={<Link href={backHref} />}
         >
           <ArrowLeft size={14} strokeWidth={2} /> {MODE_LABELS[mode]}
         </Button>
@@ -350,9 +360,9 @@ function QuizSessionInner() {
           </>
         ) : (
           <>
-            <p className="text-[0.82rem] text-text-muted mb-2">Translate this word</p>
+            <p className="text-[0.82rem] text-text-muted mb-2">{reverse ? "Type the word for this" : "Translate this word"}</p>
             <div className={`font-display text-[clamp(2rem,6vw,2.8rem)] font-bold text-text leading-[1.2] ${submitted ? "mb-4" : "mb-6"}`}>
-              {currentWord.word}
+              {reverse ? currentWord.translation : currentWord.word}
             </div>
           </>
         )}
@@ -363,7 +373,7 @@ function QuizSessionInner() {
               {isCorrectAnswer ? "Correct!" : "The answer was"}
             </p>
             <p className={`text-[1.2rem] font-bold ${isCorrectAnswer ? "text-success" : "text-error"}`}>
-              {useCloze && cloze ? cloze.answer : currentWord.translation}
+              {useCloze && cloze ? cloze.answer : reverse ? currentWord.word : currentWord.translation}
             </p>
             {!isCorrectAnswer && userInput && (
               <p className="text-[0.85rem] text-text-muted mt-1">
@@ -378,7 +388,7 @@ function QuizSessionInner() {
             <input
               ref={inputRef}
               className="input text-center text-[1.05rem]"
-              placeholder={useCloze ? "Type the missing word…" : "Type the translation…"}
+              placeholder={useCloze ? "Type the missing word…" : reverse ? "Type the original word…" : "Type the translation…"}
               value={userInput}
               onChange={(e) => setUserInput(e.target.value)}
               onKeyDown={handleKeyDown}
