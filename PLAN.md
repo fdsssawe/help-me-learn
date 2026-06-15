@@ -1,4 +1,4 @@
-# LinguaFlow — Project Plan & Roadmap
+# Lexora — Project Plan & Roadmap
 
 > Living document. Read this first when resuming work. Update it as phases complete.
 
@@ -23,7 +23,7 @@ A user enters a word (e.g. Italian `affrontare`) and we automatically fetch:
 | Area | Decision | Notes |
 |---|---|---|
 | DB + Auth | **Supabase** (Postgres + Supabase Auth + Storage), Prisma as ORM | Replaced NextAuth. Project ref `yfcmexnqxaxiingzfjof`, region `aws-0-eu-west-3` |
-| Payments (Phase 4) | **Lemon Squeezy** (Merchant of Record — handles tax) | Paywall after 50 words. (User first said "Strapi" — that's a CMS, corrected.) |
+| Payments | **Paddle** (Merchant of Record) — *migrating from Lemon Squeezy* | Paywall at 200 words. LS can't pay out to Ukraine; Polar also unsupported there → Paddle (supports UA individuals). See Phase 7. |
 | Analytics | **PostHog** (US Cloud) | |
 | Enrichment sources ($0, no keys) | **kaikki.org** (Wiktextract) + **Tatoeba** + **DeepL Free** (fallback only) | Google Translate API is NOT free — avoid scraper libs |
 | Language scope | **Italian → English first**, behind a language-keyed adapter registry so adding languages is config-level | Schema is `langCode`-aware everywhere |
@@ -86,6 +86,23 @@ Enrichment pipeline: server-side only; check Lemma cache → miss → create `pe
   - ✅ Webhook `app/api/webhooks/lemonsqueezy/route.ts` — HMAC-verified (`X-Signature`); `subscription_*` events flip `plan` pro/free
   - ✅ Vocabulary UI: "X / 200 words" indicator, upgrade card on limit, **Sonner** toasts (`<Toaster/>` in root layout — the app's notification mechanism)
   - ⬜ BLOCKED on user: create LS store + Pro product; set `LEMONSQUEEZY_CHECKOUT_URL` + `LEMONSQUEEZY_WEBHOOK_SECRET`; point an LS webhook at `/api/webhooks/lemonsqueezy` (events: subscription_*). Then restart dev to load env + new Prisma client.
+  - ⚠️ **SUPERSEDED by Phase 7** — Lemon Squeezy can't pay out to Ukraine (and the user's PayPal-UA failed). Switching to **Paddle** (see Phase 7). LS code stays until Paddle onboarding clears.
+
+- **Deployment** ✅ Vercel (dashboard import). `build` = `prisma generate && next build` (the generated client is gitignored). Prod `DATABASE_URL` = Supabase **transaction pooler (6543)** + `?pgbouncer=true&connection_limit=1`. Set `NEXT_PUBLIC_SITE_URL` in Vercel to the real domain (drives canonical/OG/sitemap/robots; falls back to `https://lexora.app`).
+
+- **Phase 5 — Quiz native-language filter + nav upgrade entry** ✅ DONE (pushed)
+  - ✅ `getQuizWords` + `/quiz` counts now only serve words whose `Lemma.targetLang === user.nativeLang` (words-style also keeps un-enriched `lemmaId: null` words; sentences-style requires native-matched examples). Fixes en/uk mixing in one quiz.
+  - ✅ Avatar popover (`components/nav.tsx`): free users get an **Upgrade to Pro** item (→ `getCheckoutUrl`), pro users a "Pro plan" badge. `plan` threaded through `app/(app)/layout.tsx`.
+  - Note: source-language "All" pill kept (now native-scoped) rather than forcing a single language.
+
+- **Phase 6 — Rename → Lexora + SEO** ✅ DONE (pushed)
+  - ✅ Renamed all brand strings (`app/page.tsx`, `(auth)/layout.tsx`, `components/nav.tsx`, `words.ts` UA string) + `package.json` name → `lexora` (repo stays `help-me-learn`). Brand constants centralized in `lib/site.ts` (`SITE_NAME/TAGLINE/DESCRIPTION/URL`).
+  - ✅ SEO: rich root `metadata` (metadataBase, title template, OG, twitter, keywords, canonical) in `app/layout.tsx`; generated `opengraph-image.tsx` + `twitter-image.tsx`, `icon.tsx`, `apple-icon.tsx`; `sitemap.ts`, `robots.ts` (disallows authed routes), `manifest.ts`; `WebApplication` JSON-LD on the landing page.
+  - ⬜ User TODO: set `NEXT_PUBLIC_SITE_URL` in Vercel; check domain/trademark for "Lexora" (`lexora.com` likely taken — plan on `lexora.app`).
+
+- **Phase 7 — Payments: Lemon Squeezy → Paddle** 🔜 NEXT (after Paddle seller verification, ~2–4 days)
+  - Why: Polar ruled out (Ukraine not on its Stripe-Connect payout list); Paddle supports Ukrainian individuals/sole traders (no incorporation).
+  - Plan: provider-neutral schema columns (`billingCustomerId`/`billingSubscriptionId`); Paddle.js overlay checkout (`NEXT_PUBLIC_PADDLE_CLIENT_TOKEN` + `NEXT_PUBLIC_PADDLE_PRICE_ID` + `customData.user_id`); `app/api/webhooks/paddle/route.ts` (verify `Paddle-Signature`); env swap LS→Paddle; sandbox test first.
 
 ## Current tech stack (post-Phase 0)
 

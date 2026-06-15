@@ -2,6 +2,22 @@ import Link from "next/link"
 import { BookOpen, Zap, Flame } from "lucide-react"
 import { ThemeToggle } from "@/components/theme-toggle"
 import { Button } from "@/components/ui/button"
+import { SITE_NAME, SITE_DESCRIPTION, SITE_URL } from "@/lib/site"
+
+const jsonLd = {
+  "@context": "https://schema.org",
+  "@type": "WebApplication",
+  name: SITE_NAME,
+  url: SITE_URL,
+  description: SITE_DESCRIPTION,
+  applicationCategory: "EducationalApplication",
+  operatingSystem: "Web",
+  offers: {
+    "@type": "Offer",
+    price: "0",
+    priceCurrency: "USD",
+  },
+}
 
 const FEATURES = [
   {
@@ -38,10 +54,14 @@ const LEVELS = [
 export default function LandingPage() {
   return (
     <div className="landing-bg min-h-dvh flex flex-col">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+      />
       {/* Header */}
       <header className="px-6 h-16 flex items-center justify-between max-w-275 mx-auto w-full">
         <span className="font-display text-[1.4rem] font-bold text-primary tracking-[-0.02em]">
-          LinguaFlow
+          Lexora
         </span>
         <div className="flex items-center gap-3">
           <ThemeToggle />
@@ -69,7 +89,7 @@ export default function LandingPage() {
           className="animate-slide-up text-[1.15rem] leading-[1.7] text-text-secondary max-w-130 mb-10"
           style={{ animationDelay: "0.1s" }}
         >
-          LinguaFlow helps you build vocabulary that lasts — with daily quizzes,
+          Lexora helps you build vocabulary that lasts — with daily quizzes,
           gentle streaks, and a cozy space to grow at your own pace.
         </p>
 
@@ -135,7 +155,7 @@ export default function LandingPage() {
 
       {/* Footer */}
       <footer className="border-t border-border px-6 py-5 text-center text-[0.82rem] text-text-muted">
-        <span className="font-display font-bold text-primary">LinguaFlow</span>
+        <span className="font-display font-bold text-primary">Lexora</span>
         {" "}· Learn one word at a time.
       </footer>
     </div>

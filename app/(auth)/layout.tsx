@@ -26,7 +26,7 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
             textDecoration: "none",
           }}
         >
-          LinguaFlow
+          Lexora
         </Link>
         <ThemeToggle />
       </header>

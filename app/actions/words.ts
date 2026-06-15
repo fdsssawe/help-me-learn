@@ -19,7 +19,7 @@ export async function suggestWords(prefix: string, languageName?: string): Promi
   const url = `https://${adapter.wiktionary}.wiktionary.org/w/api.php?action=opensearch&search=${encodeURIComponent(q)}&limit=8&namespace=0&format=json`
   try {
     const res = await fetch(url, {
-      headers: { "User-Agent": "LinguaFlow/0.1 (language-learning app)" },
+      headers: { "User-Agent": "Lexora/0.1 (language-learning app)" },
     })
     if (!res.ok) return []
     const data = (await res.json()) as [string, string[], string[], string[]]

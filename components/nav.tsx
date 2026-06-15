@@ -44,7 +44,7 @@ export function Nav({ user }: { user: NavUser }) {
           href="/dashboard"
           className="font-display text-[1.35rem] font-bold text-primary tracking-tight no-underline shrink-0"
         >
-          LinguaFlow
+          Lexora
         </Link>
 
         <nav className="flex gap-1 items-center">

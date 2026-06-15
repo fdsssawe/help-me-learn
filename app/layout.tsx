@@ -4,6 +4,7 @@ import "./globals.css"
 import { ThemeProvider } from "@/components/theme-provider"
 import { PostHogProvider } from "@/components/posthog-provider"
 import { Toaster } from "@/components/ui/sonner"
+import { SITE_NAME, SITE_TAGLINE, SITE_DESCRIPTION, SITE_URL } from "@/lib/site"
 import { cn } from "@/lib/utils";
 
 const geist = Geist({subsets:['latin'],variable:'--font-sans'});
@@ -20,8 +21,37 @@ const nunito = Nunito({
 })
 
 export const metadata: Metadata = {
-  title: "LinguaFlow — Learn Languages Joyfully",
-  description: "Build vocabulary that sticks with daily quizzes, streaks, and a warm, encouraging space to grow.",
+  metadataBase: new URL(SITE_URL),
+  title: {
+    default: `${SITE_NAME} — ${SITE_TAGLINE}`,
+    template: `%s · ${SITE_NAME}`,
+  },
+  description: SITE_DESCRIPTION,
+  applicationName: SITE_NAME,
+  keywords: [
+    "vocabulary",
+    "language learning",
+    "Italian",
+    "Spanish",
+    "flashcards",
+    "cloze quiz",
+    "spaced repetition",
+    "dictionary",
+  ],
+  authors: [{ name: SITE_NAME }],
+  alternates: { canonical: "/" },
+  openGraph: {
+    type: "website",
+    url: SITE_URL,
+    siteName: SITE_NAME,
+    title: `${SITE_NAME} — ${SITE_TAGLINE}`,
+    description: SITE_DESCRIPTION,
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: `${SITE_NAME} — ${SITE_TAGLINE}`,
+    description: SITE_DESCRIPTION,
+  },
 }
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
