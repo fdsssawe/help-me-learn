@@ -78,7 +78,7 @@ Enrichment pipeline: server-side only; check Lemma cache → miss → create `pe
   - ✅ `getQuizWords(mode, lang, style)` now includes `lemma.examples`; Sentences filters to words with examples (`lemma: { examples: { some } }`) + style-aware counts & empty state
   - ✅ Cloze: blanks the target word via `targetOffsets`, shows the translation as the hint; accepts the exact inflected form OR the headword; a word with no usable example falls back to translate
   - Reuses the existing XP/streak/badge/save flow unchanged
-  - ⬜ Pending browser verification
+  - ⬜ Pending browser verification 
 - **Phase 4 — Paywall (Lemon Squeezy)** 🔄 code built; pending LS setup + browser test
   - ✅ Free cap = **200 total words** (no daily limit; `FREE_WORD_LIMIT` in `lib/billing.ts`), enforced server-side in `createWord` (throws `WORD_LIMIT_REACHED`)
   - ✅ `User` billing fields: plan, lemonCustomerId, lemonSubscriptionId, subscriptionStatus, subscriptionRenewsAt
