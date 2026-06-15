@@ -79,8 +79,13 @@ Enrichment pipeline: server-side only; check Lemma cache → miss → create `pe
   - ✅ Cloze: blanks the target word via `targetOffsets`, shows the translation as the hint; accepts the exact inflected form OR the headword; a word with no usable example falls back to translate
   - Reuses the existing XP/streak/badge/save flow unchanged
   - ⬜ Pending browser verification
-- **Phase 4 — Paywall** ⬜
-  - 50-word gate enforced server-side in `createWord`; Lemon Squeezy checkout + webhook flips `User.plan`
+- **Phase 4 — Paywall (Lemon Squeezy)** 🔄 code built; pending LS setup + browser test
+  - ✅ Free cap = **200 total words** (no daily limit; `FREE_WORD_LIMIT` in `lib/billing.ts`), enforced server-side in `createWord` (throws `WORD_LIMIT_REACHED`)
+  - ✅ `User` billing fields: plan, lemonCustomerId, lemonSubscriptionId, subscriptionStatus, subscriptionRenewsAt
+  - ✅ Checkout: `getCheckoutUrl` action (`app/actions/billing.ts`) builds the LS hosted-checkout URL (prefilled email + custom `user_id`)
+  - ✅ Webhook `app/api/webhooks/lemonsqueezy/route.ts` — HMAC-verified (`X-Signature`); `subscription_*` events flip `plan` pro/free
+  - ✅ Vocabulary UI: "X / 200 words" indicator, upgrade card on limit, **Sonner** toasts (`<Toaster/>` in root layout — the app's notification mechanism)
+  - ⬜ BLOCKED on user: create LS store + Pro product; set `LEMONSQUEEZY_CHECKOUT_URL` + `LEMONSQUEEZY_WEBHOOK_SECRET`; point an LS webhook at `/api/webhooks/lemonsqueezy` (events: subscription_*). Then restart dev to load env + new Prisma client.
 
 ## Current tech stack (post-Phase 0)
 

@@ -12,6 +12,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Autocomplete, AutocompleteInput, AutocompleteContent, AutocompleteItem } from "@/components/ui/autocomplete"
 import { EnrichedDetail } from "@/components/enriched-detail"
 import { resolveLanguage } from "@/lib/enrichment/languages"
+import { getCheckoutUrl } from "@/app/actions/billing"
+import { FREE_WORD_LIMIT } from "@/lib/billing"
+import { toast } from "sonner"
 
 const NO_LANG = "__none__"
 import type { getWords } from "@/app/actions/words"
@@ -24,6 +27,8 @@ interface VocabularyClientProps {
   words: Word[]
   languages: Language[]
   activeLangId?: string
+  plan: string
+  totalWords: number
 }
 
 function isEnriched(word: Word) {
@@ -31,7 +36,7 @@ function isEnriched(word: Word) {
   return !!l && (l.senses.length > 0 || l.examples.length > 0 || l.conjugations.length > 0)
 }
 
-export function VocabularyClient({ words, languages, activeLangId }: VocabularyClientProps) {
+export function VocabularyClient({ words, languages, activeLangId, plan, totalWords }: VocabularyClientProps) {
   const router = useRouter()
   // Default language for the add form: the filtered language, else the only one,
   // else the last used (= most recent word's language, since words are newest-first).
@@ -51,6 +56,20 @@ export function VocabularyClient({ words, languages, activeLangId }: VocabularyC
   const [addForm, setAddForm] = useState({ word: "", notes: "", languageId: defaultLangId })
   const [editForm, setEditForm] = useState({ word: "", translation: "", notes: "", languageId: "" })
   const [formError, setFormError] = useState("")
+  const [showPaywall, setShowPaywall] = useState(false)
+  const [upgrading, setUpgrading] = useState(false)
+  const atLimit = plan === "free" && totalWords >= FREE_WORD_LIMIT
+
+  async function handleUpgrade() {
+    setUpgrading(true)
+    try {
+      const url = await getCheckoutUrl()
+      window.location.href = url
+    } catch (err) {
+      setUpgrading(false)
+      toast.error(err instanceof Error ? err.message : "Couldn't start checkout.")
+    }
+  }
 
   const filtered = words.filter((w) => {
     const q = search.toLowerCase()
@@ -89,10 +108,17 @@ export function VocabularyClient({ words, languages, activeLangId }: VocabularyC
           notes: addForm.notes.trim() || undefined,
           languageId: addForm.languageId || undefined,
         })
+        toast.success("Word added")
         resetAddForm()
         router.refresh()
       } catch (err) {
-        setFormError(err instanceof Error ? err.message : "Something went wrong.")
+        const msg = err instanceof Error ? err.message : ""
+        if (msg === "WORD_LIMIT_REACHED") {
+          resetAddForm()
+          setShowPaywall(true)
+        } else {
+          setFormError(msg || "Something went wrong.")
+        }
       }
     })
   }
@@ -146,7 +172,7 @@ export function VocabularyClient({ words, languages, activeLangId }: VocabularyC
 
   function handleDelete(id: string, wordText: string) {
     if (!window.confirm(`Delete "${wordText}"? This cannot be undone.`)) return
-    startTransition(async () => { await deleteWord(id); router.refresh() })
+    startTransition(async () => { await deleteWord(id); toast.success("Word deleted"); router.refresh() })
   }
 
   const activeLang = languages.find((l) => l.id === activeLangId)
@@ -168,10 +194,16 @@ export function VocabularyClient({ words, languages, activeLangId }: VocabularyC
             {words.length} {words.length === 1 ? "word" : "words"}
             {activeLang ? ` in ${activeLang.name}` : " across all languages"}
           </p>
+          {plan === "free" && (
+            <p className={`text-[0.78rem] mt-0.5 ${atLimit ? "text-error font-semibold" : "text-text-muted"}`}>
+              {totalWords} / {FREE_WORD_LIMIT} words on the free plan{atLimit ? " — limit reached" : ""}
+            </p>
+          )}
         </div>
         <Button
           className="gap-1.5"
           onClick={() => {
+            if (!showAddForm && atLimit) { setShowPaywall(true); return }
             setShowAddForm((v) => { if (!v) setAddForm((f) => ({ ...f, languageId: defaultLangId })); return !v })
             setEditingId(null)
           }}
@@ -182,6 +214,19 @@ export function VocabularyClient({ words, languages, activeLangId }: VocabularyC
       </div>
 
       <LanguageSelector languages={languages} activeLangId={activeLangId} basePath="/vocabulary" />
+
+      {showPaywall && (
+        <div className="card-elevated animate-slide-up p-6 mb-5 text-center">
+          <h2 className="font-display text-[1.25rem] text-text mb-1.5">Upgrade to Pro</h2>
+          <p className="text-text-muted text-[0.92rem] mb-4 max-w-md mx-auto">
+            The free plan holds up to {FREE_WORD_LIMIT} words. Go Pro for an unlimited vocabulary.
+          </p>
+          <div className="flex gap-2 justify-center">
+            <Button onClick={handleUpgrade} disabled={upgrading}>{upgrading ? "Opening checkout…" : "Upgrade to Pro"}</Button>
+            <Button variant="ghost" onClick={() => setShowPaywall(false)}>Maybe later</Button>
+          </div>
+        </div>
+      )}
 
       {/* Add form */}
       {showAddForm && (

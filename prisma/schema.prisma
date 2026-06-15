@@ -15,7 +15,11 @@ model User {
   email         String?       @unique
   name          String?
   image         String?
-  plan          String        @default("free") // free | pro (Phase 4 paywall)
+  plan                 String        @default("free") // free | pro (Phase 4 paywall)
+  lemonCustomerId      String? // Lemon Squeezy customer id
+  lemonSubscriptionId  String? // Lemon Squeezy subscription id
+  subscriptionStatus   String? // active | on_trial | cancelled | expired | …
+  subscriptionRenewsAt DateTime?
   nativeLang    String        @default("en") // translation/display target (en | uk | …)
   xp            Int           @default(0)
   streak        Int           @default(0)

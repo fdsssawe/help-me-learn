@@ -3,6 +3,7 @@ import { Fraunces, Nunito, Geist } from "next/font/google"
 import "./globals.css"
 import { ThemeProvider } from "@/components/theme-provider"
 import { PostHogProvider } from "@/components/posthog-provider"
+import { Toaster } from "@/components/ui/sonner"
 import { cn } from "@/lib/utils";
 
 const geist = Geist({subsets:['latin'],variable:'--font-sans'});
@@ -29,6 +30,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body>
         <ThemeProvider>
           <PostHogProvider>{children}</PostHogProvider>
+          <Toaster />
         </ThemeProvider>
       </body>
     </html>

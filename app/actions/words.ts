@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma"
 import { getAuthUser, getCurrentUser, requireUserId as requireUser } from "@/lib/dal"
 import { enrichLemma } from "@/lib/enrichment/enrich"
 import { resolveLanguage } from "@/lib/enrichment/languages"
+import { FREE_WORD_LIMIT, isPro } from "@/lib/billing"
 
 // Prefix suggestions for the add-word field, from Wiktionary's opensearch API
 // (real headwords for the language → they'll enrich). Cheap auth check (no upsert).
@@ -55,6 +56,13 @@ export async function createWord(data: {
   const user = await getCurrentUser()
   if (!user) throw new Error("Unauthorized")
   const userId = user.id
+
+  // Free plan word cap (Pro is unlimited).
+  if (!isPro(user)) {
+    const count = await prisma.word.count({ where: { userId } })
+    if (count >= FREE_WORD_LIMIT) throw new Error("WORD_LIMIT_REACHED")
+  }
+
   const word = data.word.trim()
   let translation = data.translation?.trim() ?? ""
   let lemmaId: string | undefined
