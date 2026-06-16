@@ -1,6 +1,6 @@
-import type { getWords } from "@/app/actions/words"
+import type { getLemmaDetail } from "@/app/actions/words"
 
-type Lemma = NonNullable<Awaited<ReturnType<typeof getWords>>[number]["lemma"]>
+type Lemma = NonNullable<Awaited<ReturnType<typeof getLemmaDetail>>>
 
 const POS_LABEL: Record<string, string> = {
   verb: "verb",

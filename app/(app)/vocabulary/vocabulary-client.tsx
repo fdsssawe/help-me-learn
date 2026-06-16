@@ -3,7 +3,7 @@
 import { useState, useTransition, useRef } from "react"
 import { useRouter } from "next/navigation"
 import { Pencil, Trash2, Sprout, Plus, X, ChevronDown } from "lucide-react"
-import { createWord, updateWord, deleteWord, suggestWords } from "@/app/actions/words"
+import { createWord, updateWord, deleteWord, suggestWords, getLemmaDetail } from "@/app/actions/words"
 import { LanguageSelector } from "@/components/language-selector"
 import { LangTag } from "@/components/lang-tag"
 import { Button } from "@/components/ui/button"
@@ -31,9 +31,11 @@ interface VocabularyClientProps {
   totalWords: number
 }
 
+type LemmaDetail = NonNullable<Awaited<ReturnType<typeof getLemmaDetail>>>
+
 function isEnriched(word: Word) {
-  const l = word.lemma
-  return !!l && (l.senses.length > 0 || l.examples.length > 0 || l.conjugations.length > 0)
+  const c = word.lemma?._count
+  return !!c && (c.senses > 0 || c.examples > 0 || c.conjugations > 0)
 }
 
 export function VocabularyClient({ words, languages, activeLangId, plan, totalWords }: VocabularyClientProps) {
@@ -50,6 +52,9 @@ export function VocabularyClient({ words, languages, activeLangId, plan, totalWo
   const [showAddForm, setShowAddForm] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [openIds, setOpenIds] = useState<Set<string>>(new Set())
+  // Lazily-loaded enrichment detail per lemma id (fetched on first expand, cached).
+  const [details, setDetails] = useState<Record<string, LemmaDetail>>({})
+  const [loadingDetail, setLoadingDetail] = useState<Set<string>>(new Set())
   const [suggestions, setSuggestions] = useState<string[]>([])
   const [suggestOpen, setSuggestOpen] = useState(false)
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -87,6 +92,29 @@ export function VocabularyClient({ words, languages, activeLangId, plan, totalWo
       else next.add(id)
       return next
     })
+  }
+
+  // Toggle a row and, when opening, kick off the (cached) detail fetch.
+  function handleToggle(word: Word) {
+    const willOpen = !openIds.has(word.id)
+    toggleOpen(word.id)
+    if (willOpen && word.lemma) loadDetail(word.lemma.id)
+  }
+
+  // Fetch a lemma's full enrichment detail on first expand; cache thereafter.
+  async function loadDetail(lemmaId: string) {
+    if (details[lemmaId] || loadingDetail.has(lemmaId)) return
+    setLoadingDetail((prev) => new Set(prev).add(lemmaId))
+    try {
+      const detail = await getLemmaDetail(lemmaId)
+      if (detail) setDetails((prev) => ({ ...prev, [lemmaId]: detail }))
+    } finally {
+      setLoadingDetail((prev) => {
+        const next = new Set(prev)
+        next.delete(lemmaId)
+        return next
+      })
+    }
   }
 
   function resetAddForm() {
@@ -350,7 +378,7 @@ export function VocabularyClient({ words, languages, activeLangId, plan, totalWo
             const open = openIds.has(word.id)
 
             return (
-              <Collapsible key={word.id} open={open} onOpenChange={() => toggleOpen(word.id)} className="card animate-fade-in">
+              <Collapsible key={word.id} open={open} onOpenChange={() => handleToggle(word)} className="card animate-fade-in">
                 <div className="flex items-start justify-between gap-4 px-[1.125rem] py-[0.875rem]">
                   <div className="flex-1 min-w-0">
                     <div className="flex items-baseline gap-2 flex-wrap">
@@ -373,7 +401,7 @@ export function VocabularyClient({ words, languages, activeLangId, plan, totalWo
                   </div>
                   <div className="flex gap-1 shrink-0 items-center">
                     {showDetails && (
-                      <Button variant="ghost" size="icon" title={open ? "Hide details" : "Dictionary details"} onClick={() => toggleOpen(word.id)}>
+                      <Button variant="ghost" size="icon" title={open ? "Hide details" : "Dictionary details"} onClick={() => handleToggle(word)}>
                         <ChevronDown size={16} strokeWidth={2} className={`transition-transform duration-200 ${open ? "rotate-180" : ""}`} />
                       </Button>
                     )}
@@ -388,7 +416,15 @@ export function VocabularyClient({ words, languages, activeLangId, plan, totalWo
                 {showDetails && word.lemma && (
                   <CollapsibleContent>
                     <div className="border-t border-border px-[1.125rem] py-3.5">
-                      <EnrichedDetail lemma={word.lemma} />
+                      {details[word.lemma.id] ? (
+                        <EnrichedDetail lemma={details[word.lemma.id]} />
+                      ) : (
+                        <div className="animate-pulse flex flex-col gap-2">
+                          <div className="h-3.5 w-24 rounded bg-bg-subtle" />
+                          <div className="h-3 w-3/4 rounded bg-bg-subtle" />
+                          <div className="h-3 w-2/3 rounded bg-bg-subtle" />
+                        </div>
+                      )}
                     </div>
                   </CollapsibleContent>
                 )}

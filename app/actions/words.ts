@@ -32,18 +32,41 @@ export async function suggestWords(prefix: string, languageName?: string): Promi
 
 export async function getWords(languageId?: string) {
   const userId = await requireUser()
+  // Keep the list query light: pull only the counts needed to decide whether a
+  // row has expandable dictionary data. The full enrichment graph (senses,
+  // examples, conjugations — potentially dozens of rows + a conjugation table
+  // per word) is fetched lazily on expand via getLemmaDetail.
   return prisma.word.findMany({
     where: { userId, ...(languageId ? { languageId } : {}) },
     orderBy: { createdAt: "desc" },
     include: {
       language: { select: { name: true, emoji: true } },
       lemma: {
-        include: {
-          senses: { orderBy: { order: "asc" } },
-          examples: { orderBy: { order: "asc" } },
-          conjugations: { orderBy: { order: "asc" } },
+        select: {
+          id: true,
+          status: true,
+          _count: { select: { senses: true, examples: true, conjugations: true } },
         },
       },
+    },
+  })
+}
+
+// Full enrichment detail for one lemma, loaded on demand when a vocabulary row
+// is expanded. Authorized by requiring the caller to own a word for this lemma.
+export async function getLemmaDetail(lemmaId: string) {
+  const userId = await requireUser()
+  const owns = await prisma.word.findFirst({
+    where: { userId, lemmaId },
+    select: { id: true },
+  })
+  if (!owns) return null
+  return prisma.lemma.findUnique({
+    where: { id: lemmaId },
+    include: {
+      senses: { orderBy: { order: "asc" } },
+      examples: { orderBy: { order: "asc" } },
+      conjugations: { orderBy: { order: "asc" } },
     },
   })
 }
