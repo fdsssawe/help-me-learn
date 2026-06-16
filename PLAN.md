@@ -2,6 +2,17 @@
 
 > Living document. Read this first when resuming work. Update it as phases complete.
 
+## ⚠️ Uncommitted work lives in `git stash` (as of 2026-06-16)
+
+Going to staging with **no users yet**, so the paywall + legal/pricing pages were **stashed, not committed**. The committed/deployed branch therefore **still enforces the 500-word cap** and has **no Pricing/Terms/Privacy/Refunds pages**. Restore from the stash before charging money / submitting to Paddle.
+
+`git stash list`:
+- **`stash@{0}` — "paywall latest" (THE one to restore).** Full set: legal pages (`app/(legal)/{layout,pricing,privacy,terms,refunds}`, `components/legal.tsx`), footer + `sitemap.ts` links, `lib/site.ts` legal/pricing constants, **and the paywall kill-switch** `PAYWALL_ENABLED = false` in `lib/billing.ts` (gated in `app/actions/words.ts` + `vocabulary-client.tsx`). Restore with `git stash apply stash@{0}` (use `apply`, not `pop`, until it's verified).
+- **`stash@{1}` — "paywall latest" (STALE, can drop).** An earlier subset of `stash@{0}` **missing the `app/(legal)/` + `components/legal.tsx` files**. Superseded — `git stash drop stash@{1}` once `stash@{0}` is applied.
+- **`stash@{2}` — "mask all input for posthog".** Adds `session_recording: { maskAllInputs: true }` to `components/posthog-provider.tsx`. (This was intentionally reverted in the working tree earlier; default posthog-js already masks inputs, so this is just making it explicit — optional.)
+
+To launch the paywall later: apply `stash@{0}`, then flip `PAYWALL_ENABLED` back to `true` (Phase 7).
+
 ## Product vision
 
 Pivot from a manual word-list app to an **auto-enriched dictionary + smarter quizzes**.
