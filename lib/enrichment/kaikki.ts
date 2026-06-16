@@ -5,6 +5,8 @@ export type KaikkiSense = {
   glosses?: string[]
   raw_glosses?: string[]
   tags?: string[]
+  // Present on inflected-form entries, e.g. dissetato → [{ word: "dissetare" }].
+  form_of?: { word?: string }[]
 }
 export type KaikkiForm = { form?: string; tags?: string[] }
 export type KaikkiEntry = {

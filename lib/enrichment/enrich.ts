@@ -21,18 +21,37 @@ type RawSense = { pos: string; glosses: string[]; tags: string[]; order: number 
 
 // ── normalization helpers ──────────────────────────────────────────────────
 
+// A "form-of" sense is a grammar note, not a translation: e.g. dissetato →
+// "past participle of dissetare". kaikki tags these `form-of` and/or carries a
+// `form_of` link to the base lemma.
+function isFormOf(s: { tags?: string[]; form_of?: { word?: string }[] }): boolean {
+  return (s.tags ?? []).includes("form-of") || !!s.form_of?.length
+}
+
 function normalizeSenses(entries: KaikkiEntry[]): RawSense[] {
   const senses: RawSense[] = []
   let order = 0
   for (const entry of entries) {
     const pos = entry.pos ?? "unknown"
     for (const s of entry.senses ?? []) {
+      if (isFormOf(s)) continue // skip "past participle of …" pseudo-meanings
       const glosses = s.glosses ?? s.raw_glosses ?? []
       if (!glosses.length) continue
       senses.push({ pos, glosses, tags: s.tags ?? [], order: order++ })
     }
   }
   return senses
+}
+
+// The base lemma an inflected form points to (dissetato → "dissetare"), if any.
+function baseLemmaOf(entries: KaikkiEntry[]): string | null {
+  for (const entry of entries) {
+    for (const s of entry.senses ?? []) {
+      const base = s.form_of?.[0]?.word?.trim()
+      if (isFormOf(s) && base) return base
+    }
+  }
+  return null
 }
 
 // kaikki glosses are English. For non-English targets, translate each gloss,
@@ -160,9 +179,23 @@ export async function enrichLemma(
       fetchKaikki(text, adapter.kaikki),
       fetchTatoeba(text, adapter.tatoeba, target.tatoeba),
     ])
-    const forms = entries.flatMap((e) => e.forms ?? [])
-    const senses = await translateSenses(normalizeSenses(entries), target)
-    const conjugations = normalizeConjugations(entries)
+    // If the word is purely an inflected form (kaikki has only "form-of" senses,
+    // e.g. dissetato → "past participle of dissetare"), resolve its dictionary
+    // data from the base lemma so the user gets real translations — not a
+    // grammar note. Examples stay specific to the looked-up form; the base
+    // lemma's forms (which include this form) still drive example highlighting.
+    let dictEntries = entries
+    if (!normalizeSenses(entries).length) {
+      const base = baseLemmaOf(entries)
+      if (base && base.toLowerCase() !== text) {
+        const baseEntries = await fetchKaikki(base, adapter.kaikki)
+        if (normalizeSenses(baseEntries).length) dictEntries = baseEntries
+      }
+    }
+
+    const forms = dictEntries.flatMap((e) => e.forms ?? [])
+    const senses = await translateSenses(normalizeSenses(dictEntries), target)
+    const conjugations = normalizeConjugations(dictEntries)
     const examples = normalizeExamples(tatoeba, text, forms, target.tatoeba)
 
     await prisma.$transaction([
