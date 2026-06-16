@@ -58,7 +58,9 @@ export function VocabularyClient({ words, languages, activeLangId, plan, totalWo
   const [suggestions, setSuggestions] = useState<string[]>([])
   const [suggestOpen, setSuggestOpen] = useState(false)
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const [addForm, setAddForm] = useState({ word: "", notes: "", languageId: defaultLangId })
+  const [addForm, setAddForm] = useState({ word: "", translation: "", notes: "", languageId: defaultLangId })
+  // Revealed when auto-translation fails so the user can supply one manually.
+  const [needsManualTranslation, setNeedsManualTranslation] = useState(false)
   const [editForm, setEditForm] = useState({ word: "", translation: "", notes: "", languageId: "" })
   const [formError, setFormError] = useState("")
   const [showPaywall, setShowPaywall] = useState(false)
@@ -118,10 +120,11 @@ export function VocabularyClient({ words, languages, activeLangId, plan, totalWo
   }
 
   function resetAddForm() {
-    setAddForm({ word: "", notes: "", languageId: defaultLangId })
+    setAddForm({ word: "", translation: "", notes: "", languageId: defaultLangId })
     setSuggestions([])
     setSuggestOpen(false)
     setFormError("")
+    setNeedsManualTranslation(false)
     setShowAddForm(false)
   }
 
@@ -133,6 +136,7 @@ export function VocabularyClient({ words, languages, activeLangId, plan, totalWo
       try {
         const res = await createWord({
           word: addForm.word.trim(),
+          translation: addForm.translation.trim() || undefined,
           notes: addForm.notes.trim() || undefined,
           languageId: addForm.languageId || undefined,
         })
@@ -141,6 +145,8 @@ export function VocabularyClient({ words, languages, activeLangId, plan, totalWo
             resetAddForm()
             setShowPaywall(true)
           } else {
+            // Reveal a manual translation field so the user can save anyway.
+            setNeedsManualTranslation(true)
             setFormError(res.message)
           }
           return
@@ -294,6 +300,18 @@ export function VocabularyClient({ words, languages, activeLangId, plan, totalWo
                   : "Pick a supported language above for suggestions & auto-translate."}
               </p>
             </div>
+            {needsManualTranslation && (
+              <div>
+                <label className={labelCls}>Translation</label>
+                <input
+                  className="input"
+                  placeholder="Type the translation…"
+                  autoFocus
+                  value={addForm.translation}
+                  onChange={(e) => setAddForm((f) => ({ ...f, translation: e.target.value }))}
+                />
+              </div>
+            )}
             <div>
               <label className={labelCls}>Notes <span className="font-normal opacity-70">(optional)</span></label>
               <textarea className="input resize-y" placeholder="Any context, usage example, or memory trick…" rows={2} value={addForm.notes} onChange={(e) => setAddForm((f) => ({ ...f, notes: e.target.value }))} />
