@@ -106,20 +106,57 @@ function findOffsets(sentence: string, formSet: Set<string>, stem: string): numb
   return []
 }
 
+// Tokenize the target-language glosses into ordered content words (+ short
+// stems), preserving gloss order so the primary translation is tried first.
+// Drops the infinitive "to", parentheticals, and 1-2 letter function words.
+function glossTokens(glosses: string[]): { word: string; stem: string }[] {
+  const seen = new Set<string>()
+  const tokens: { word: string; stem: string }[] = []
+  for (const g of glosses) {
+    const cleaned = g.toLowerCase().replace(/\(.*?\)/g, " ")
+    for (const w of cleaned.match(/\p{L}+/gu) ?? []) {
+      if (w.length < 3 || w === "to" || seen.has(w)) continue
+      seen.add(w)
+      tokens.push({ word: w, stem: w.length >= 4 ? w.slice(0, w.length - 2) : w })
+    }
+  }
+  return tokens
+}
+
+// Best-effort highlight of the translated word in a target-language sentence.
+// Tried in gloss order (primary translation first) so the headword's own word
+// wins over incidental gloss nouns — e.g. highlight "quenches", not "thirst".
+function findTranslationOffsets(sentence: string, tokens: { word: string; stem: string }[]): number[] {
+  for (const { word, stem } of tokens) {
+    const re = /\p{L}+/gu
+    let m: RegExpExecArray | null
+    while ((m = re.exec(sentence)) !== null) {
+      const w = m[0].toLowerCase()
+      if (w === word || (stem.length >= 4 && w.startsWith(stem))) {
+        return [m.index, m.index + m[0].length]
+      }
+    }
+  }
+  return []
+}
+
 function normalizeExamples(
   results: Awaited<ReturnType<typeof fetchTatoeba>>,
   headword: string,
   forms: KaikkiForm[],
-  targetTatoeba: string
+  targetTatoeba: string,
+  glosses: string[]
 ) {
   const formSet = buildFormSet(headword, forms)
   const stem = headword.slice(0, Math.max(4, headword.length - 3)).toLowerCase()
+  const tokens = glossTokens(glosses)
   const seen = new Set<string>()
   const candidates: {
     sourceText: string
     targetText: string
     difficulty: number
     targetOffsets: number[]
+    translationOffsets: number[]
   }[] = []
 
   for (const r of results) {
@@ -133,6 +170,7 @@ function normalizeExamples(
       targetText: translated,
       difficulty: r.text.length,
       targetOffsets: findOffsets(r.text, formSet, stem),
+      translationOffsets: findTranslationOffsets(translated, tokens),
     })
   }
 
@@ -196,7 +234,15 @@ export async function enrichLemma(
     const forms = dictEntries.flatMap((e) => e.forms ?? [])
     const senses = await translateSenses(normalizeSenses(dictEntries), target)
     const conjugations = normalizeConjugations(dictEntries)
-    const examples = normalizeExamples(tatoeba, text, forms, target.tatoeba)
+    // Highlight the translated word in example translations using the (target-
+    // language) glosses for this lemma.
+    const examples = normalizeExamples(
+      tatoeba,
+      text,
+      forms,
+      target.tatoeba,
+      senses.flatMap((s) => s.glosses)
+    )
 
     await prisma.$transaction([
       prisma.sense.deleteMany({ where: { lemmaId: lemma.id } }),

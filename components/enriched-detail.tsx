@@ -66,7 +66,9 @@ export function EnrichedDetail({ lemma }: { lemma: Lemma }) {
                 <p className="text-text">
                   <Highlighted text={e.sourceText} offsets={e.targetOffsets} />
                 </p>
-                <p className="text-[0.82rem] text-text-muted">{e.targetText}</p>
+                <p className="text-[0.82rem] text-text-muted">
+                  <Highlighted text={e.targetText} offsets={e.translationOffsets} />
+                </p>
               </li>
             ))}
           </ul>

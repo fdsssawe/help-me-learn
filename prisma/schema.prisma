@@ -124,6 +124,8 @@ model Example {
   source        String @default("tatoeba")
   difficulty    Int    @default(0) // length proxy → easy→hard ordering
   targetOffsets Int[] // [start, end] of the target word in sourceText; empty if none
+  // [start, end] of the translated word in targetText (best-effort, gloss-based); empty if none
+  translationOffsets Int[] @default([])
   order         Int    @default(0)
 }
 
