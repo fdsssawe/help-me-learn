@@ -20,6 +20,7 @@ model User {
   lemonSubscriptionId  String? // Lemon Squeezy subscription id
   subscriptionStatus   String? // active | on_trial | cancelled | expired | …
   subscriptionRenewsAt DateTime?
+  limitReachedNotified Boolean       @default(false) // admin emailed once when this user hit the free cap
   nativeLang    String        @default("en") // translation/display target (en | uk | …)
   xp            Int           @default(0)
   streak        Int           @default(0)

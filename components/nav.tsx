@@ -108,6 +108,7 @@ export function Nav({ user }: { user: NavUser }) {
                       })}
                     </div>
                   </div>
+                  {/* Upgrade to Pro temporarily hidden (payments paused until Paddle is live).
                   <div className="h-px bg-border my-1.5" />
                   {user.plan === "free" ? (
                     <button
@@ -123,6 +124,7 @@ export function Nav({ user }: { user: NavUser }) {
                       Pro plan
                     </div>
                   )}
+                  */}
                   <div className="h-px bg-border my-1.5" />
                   <button
                     onClick={() => { signOut(); setMenuOpen(false) }}

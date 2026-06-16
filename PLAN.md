@@ -103,11 +103,15 @@ Enrichment pipeline: server-side only; check Lemma cache → miss → create `pe
 - **Phase 7 — Payments: Lemon Squeezy → Paddle** 🔜 NEXT (after Paddle seller verification, ~2–4 days)
   - Why: Polar ruled out (Ukraine not on its Stripe-Connect payout list); Paddle supports Ukrainian individuals/sole traders (no incorporation).
   - Plan: provider-neutral schema columns (`billingCustomerId`/`billingSubscriptionId`); Paddle.js overlay checkout (`NEXT_PUBLIC_PADDLE_CLIENT_TOKEN` + `NEXT_PUBLIC_PADDLE_PRICE_ID` + `customData.user_id`); `app/api/webhooks/paddle/route.ts` (verify `Paddle-Signature`); env swap LS→Paddle; sandbox test first.
+  - **⏳ Interim (while waiting on Paddle account) — temporary, revert when Paddle is live:**
+    - **Upgrade entry hidden:** the "Upgrade to Pro" item in the avatar popover (`components/nav.tsx`) is JSX-commented out (no checkout path is sellable yet). `handleUpgrade`/`getCheckoutUrl`/`Sparkles` left in place — uncomment the block to restore.
+    - **Free cap raised 200 → 500:** `FREE_WORD_LIMIT = 500` (`lib/billing.ts`); nudge counter moved `100 → 400` (`WORD_LIMIT_NUDGE_AT`). Counter/paywall read the constant, so they tracked automatically.
+    - **Admin email on cap hit:** `createWord` emails `ADMIN_EMAIL` (`zhovanukolexander@gmail.com`) the first time a user is blocked at the limit. New `lib/email.ts` (Resend HTTP API, no SDK; best-effort — logs & no-ops if unset). One email per user via new `User.limitReachedNotified` flag. **Needs env `RESEND_API_KEY` in Vercel** (+ optional `EMAIL_FROM`; default sandbox sender `onboarding@resend.dev` only delivers to the Resend account's own email — sign up for Resend with the admin address). Redeploy after setting.
 
 - **Phase 8 — Quiz UX polish + XP anti-farm** ✅ DONE (pushed)
   - ✅ Lenient answer matching (`lib/quiz-match.ts` — `answerMatches`/`normalizeAnswer`): accepts any comma/`/`/`;`/"or" alternative, ignores leading "to ", parentheticals, case, trailing punctuation. Used in `session/page.tsx` `checkAnswer` (cloze too).
   - ✅ Quiz **direction toggle** (Words style only) — `?dir=forward|reverse` via `direction-toggle.tsx` (mirrors `style-toggle.tsx`); reverse shows the translation and accepts the source word. Threaded through `/quiz` mode links, `StyleToggle`, and the session back-link.
-  - ✅ Paywall counter hidden until `WORD_LIMIT_NUDGE_AT = 100` words (`lib/billing.ts`, `vocabulary-client.tsx`); 200 cap + upgrade card unchanged.
+  - ✅ Paywall counter hidden until `WORD_LIMIT_NUDGE_AT` words (`lib/billing.ts`, `vocabulary-client.tsx`); cap + upgrade card unchanged. *(Cap/nudge later bumped to 500/400 in the Phase 7 interim; upgrade entry hidden there.)*
   - ✅ XP anti-farm: `saveQuizSession` awards XP only for words correct for the **first time today** (queries prior same-day correct `QuizAnswer`s via `QuizSession.completedAt`); completion bonus only if ≥1 new-correct word. Replays earn 0 (+ a muted "no XP" note on results). Streak/badges/quizCount unchanged.
 
 ## Current tech stack (post-Phase 0)

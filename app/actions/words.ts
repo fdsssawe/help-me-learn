@@ -6,6 +6,7 @@ import { getAuthUser, getCurrentUser, requireUserId as requireUser } from "@/lib
 import { enrichLemma } from "@/lib/enrichment/enrich"
 import { resolveLanguage } from "@/lib/enrichment/languages"
 import { FREE_WORD_LIMIT, isPro } from "@/lib/billing"
+import { sendEmail, ADMIN_EMAIL } from "@/lib/email"
 
 // Prefix suggestions for the add-word field, from Wiktionary's opensearch API
 // (real headwords for the language → they'll enrich). Cheap auth check (no upsert).
@@ -68,7 +69,24 @@ export async function createWord(data: {
   // Free plan word cap (Pro is unlimited).
   if (!isPro(user)) {
     const count = await prisma.word.count({ where: { userId } })
-    if (count >= FREE_WORD_LIMIT) return { ok: false, reason: "limit" }
+    if (count >= FREE_WORD_LIMIT) {
+      // Notify admin once per user that they've hit the free cap.
+      if (!user.limitReachedNotified) {
+        await prisma.user.update({ where: { id: userId }, data: { limitReachedNotified: true } })
+        await sendEmail({
+          to: ADMIN_EMAIL,
+          subject: `Lexora: a user hit the ${FREE_WORD_LIMIT}-word free limit`,
+          html: `<p>A user just reached the free word limit.</p>
+<ul>
+  <li><strong>Email:</strong> ${user.email ?? "(unknown)"}</li>
+  <li><strong>Name:</strong> ${user.name ?? "(none)"}</li>
+  <li><strong>User ID:</strong> ${userId}</li>
+  <li><strong>Words saved:</strong> ${count}</li>
+</ul>`,
+        })
+      }
+      return { ok: false, reason: "limit" }
+    }
   }
 
   const word = data.word.trim()
