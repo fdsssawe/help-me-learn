@@ -36,7 +36,14 @@ export async function getQuizWords(
   }
 
   const include = {
-    lemma: { include: { examples: { orderBy: { order: "asc" as const } } } },
+    lemma: {
+      include: {
+        examples: { orderBy: { order: "asc" as const } },
+        // All sense glosses are valid answers ("inn, tavern, bistro…"), not just
+        // the single stored Word.translation.
+        senses: { orderBy: { order: "asc" as const } },
+      },
+    },
   }
 
   if (mode === "last_lesson") {

@@ -105,7 +105,12 @@ function QuizSessionInner() {
       return v === normalizeAnswer(cloze.answer) || v === normalizeAnswer(word.word)
     }
     // Reverse: prompt is the translation, expected answer is the source word.
-    return reverse ? answerMatches(input, word.word) : answerMatches(input, word.translation)
+    if (reverse) return answerMatches(input, word.word)
+    // Forward: accept the stored translation OR any gloss across all the lemma's
+    // senses (the "Meanings" panel) — e.g. osteria → inn / tavern / bistro.
+    const glosses = word.lemma?.senses.flatMap((s) => s.glosses) ?? []
+    const accepted = [word.translation, ...glosses].filter(Boolean).join(", ")
+    return answerMatches(input, accepted)
   }
 
   function handleSubmit() {
