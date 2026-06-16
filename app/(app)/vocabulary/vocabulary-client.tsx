@@ -103,22 +103,25 @@ export function VocabularyClient({ words, languages, activeLangId, plan, totalWo
     setFormError("")
     startTransition(async () => {
       try {
-        await createWord({
+        const res = await createWord({
           word: addForm.word.trim(),
           notes: addForm.notes.trim() || undefined,
           languageId: addForm.languageId || undefined,
         })
+        if (!res.ok) {
+          if (res.reason === "limit") {
+            resetAddForm()
+            setShowPaywall(true)
+          } else {
+            setFormError(res.message)
+          }
+          return
+        }
         toast.success("Word added")
         resetAddForm()
         router.refresh()
-      } catch (err) {
-        const msg = err instanceof Error ? err.message : ""
-        if (msg === "WORD_LIMIT_REACHED") {
-          resetAddForm()
-          setShowPaywall(true)
-        } else {
-          setFormError(msg || "Something went wrong.")
-        }
+      } catch {
+        setFormError("Something went wrong. Please try again.")
       }
     })
   }

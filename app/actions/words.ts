@@ -47,12 +47,20 @@ export async function getWords(languageId?: string) {
   })
 }
 
+// Expected, user-facing outcomes are RETURNED (not thrown): Next.js redacts
+// thrown Error messages from server actions in production, so the client can't
+// reliably read them. Only genuinely unexpected failures throw.
+export type CreateWordResult =
+  | { ok: true }
+  | { ok: false; reason: "limit" }
+  | { ok: false; reason: "no_translation"; message: string }
+
 export async function createWord(data: {
   word: string
   translation?: string
   notes?: string
   languageId?: string
-}) {
+}): Promise<CreateWordResult> {
   const user = await getCurrentUser()
   if (!user) throw new Error("Unauthorized")
   const userId = user.id
@@ -60,7 +68,7 @@ export async function createWord(data: {
   // Free plan word cap (Pro is unlimited).
   if (!isPro(user)) {
     const count = await prisma.word.count({ where: { userId } })
-    if (count >= FREE_WORD_LIMIT) throw new Error("WORD_LIMIT_REACHED")
+    if (count >= FREE_WORD_LIMIT) return { ok: false, reason: "limit" }
   }
 
   const word = data.word.trim()
@@ -84,15 +92,19 @@ export async function createWord(data: {
   }
 
   if (!translation) {
-    throw new Error(
-      "Couldn't auto-translate this word — add a translation, or tag it with a supported language (Italian)."
-    )
+    return {
+      ok: false,
+      reason: "no_translation",
+      message:
+        "Couldn't find this word in the dictionary — check the spelling, or add a translation yourself.",
+    }
   }
 
   await prisma.word.create({
     data: { word, translation, notes: data.notes, languageId: data.languageId, lemmaId, userId },
   })
   revalidatePath("/vocabulary")
+  return { ok: true }
 }
 
 export async function updateWord(
