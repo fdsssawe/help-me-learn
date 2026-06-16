@@ -4,6 +4,7 @@ import "./globals.css"
 import { ThemeProvider } from "@/components/theme-provider"
 import { PostHogProvider } from "@/components/posthog-provider"
 import { Toaster } from "@/components/ui/sonner"
+import { SpeedInsights } from "@vercel/speed-insights/next"
 import { SITE_NAME, SITE_TAGLINE, SITE_DESCRIPTION, SITE_URL } from "@/lib/site"
 import { cn } from "@/lib/utils";
 
@@ -61,6 +62,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <ThemeProvider>
           <PostHogProvider>{children}</PostHogProvider>
           <Toaster />
+          <SpeedInsights />
         </ThemeProvider>
       </body>
     </html>
