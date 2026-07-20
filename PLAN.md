@@ -125,6 +125,14 @@ Enrichment pipeline: server-side only; check Lemma cache → miss → create `pe
   - ✅ Paywall counter hidden until `WORD_LIMIT_NUDGE_AT` words (`lib/billing.ts`, `vocabulary-client.tsx`); cap + upgrade card unchanged. *(Cap/nudge later bumped to 500/400 in the Phase 7 interim; upgrade entry hidden there.)*
   - ✅ XP anti-farm: `saveQuizSession` awards XP only for words correct for the **first time today** (queries prior same-day correct `QuizAnswer`s via `QuizSession.completedAt`); completion bonus only if ≥1 new-correct word. Replays earn 0 (+ a muted "no XP" note on results). Streak/badges/quizCount unchanged.
 
+- **Phase 9 — Image word extraction (OCR)** ✅ DONE (pushed)
+  - Flow: upload/pick an image → **client-side OCR** (tesseract.js WASM, Italian `ita`, no key, no image upload) → tokenize → server validates/de-dupes/translates → review dialog → add selected words.
+  - ✅ OCR is **100% client-side** (`components/extract-words-dialog.tsx`, dynamic `import("tesseract.js")`) — matches the "$0, no-keys" philosophy and avoids Vercel's 4.5 MB body cap / function timeout (only a JSON token list reaches the server). Model/WASM load from CDN on first use, browser-cached after. File input `accept="image/*"` (no `capture`, so mobile can pick camera **or** gallery).
+  - ✅ **Smart filtering**: Italian function-word stoplist (`lib/enrichment/stopwords.ts`, `isStopword`), inflected forms reduced to their dictionary base (parlo/parla → parlare) via `resolveHeadword` in `lib/enrichment/enrich.ts` (reuses kaikki `normalizeSenses`/`baseLemmaOf`), non-dictionary junk dropped, and words already in the user's vocab flagged/skipped.
+  - ✅ Server: `extractCandidates`/`addExtractedWords` logic in `lib/enrichment/extract.ts` (reuses cached `enrichLemma`). Heavy dictionary lookups run in `app/api/extract/route.ts` (`export const maxDuration = 60`); saving stays a server action (`app/actions/extract.ts`). Bounded work: `MAX_CANDIDATES = 40`, concurrency pool of 6. `resolveHeadword` returns kaikki entries so `enrichLemma` skips a duplicate fetch on cold words.
+  - ✅ UI: shadcn-style **Dialog** added by hand (`components/ui/dialog.tsx`, base-ui — the base-nova registry's `add dialog` tried to overwrite `button.tsx`, so written manually) — responsive bottom-sheet on mobile, centered card on desktop; review checklist with select-all + "in your list" badges. "From image" button in the vocabulary header, gated to enrichment-supported languages, wired to the existing paywall/cap + Sonner toasts.
+  - ⬜ User TODO: **verify live on the deployed site** (real OCR quality + first-run CDN model download, esp. on mobile) — not exercisable from the dev tooling. If a CSP is ever added, allow the tesseract CDN (jsDelivr) + `blob:`/`wasm-unsafe-eval` for the worker.
+
 ## Current tech stack (post-Phase 0)
 
 - Next.js 16.2.4 (Turbopack) + TypeScript + Tailwind v4 + React 19
