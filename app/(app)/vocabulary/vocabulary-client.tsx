@@ -11,6 +11,7 @@ import { Collapsible, CollapsibleContent } from "@/components/ui/collapsible"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Autocomplete, AutocompleteInput, AutocompleteContent, AutocompleteItem } from "@/components/ui/autocomplete"
 import { EnrichedDetail } from "@/components/enriched-detail"
+import { ExtractWordsDialog } from "@/components/extract-words-dialog"
 import { resolveLanguage } from "@/lib/enrichment/languages"
 import { getCheckoutUrl } from "@/app/actions/billing"
 import { FREE_WORD_LIMIT, WORD_LIMIT_NUDGE_AT } from "@/lib/billing"
@@ -66,6 +67,15 @@ export function VocabularyClient({ words, languages, activeLangId, plan, totalWo
   const [showPaywall, setShowPaywall] = useState(false)
   const [upgrading, setUpgrading] = useState(false)
   const atLimit = plan === "free" && totalWords >= FREE_WORD_LIMIT
+
+  // Language used by the image word-extraction flow: prefer the active language,
+  // else the add-form default, else the first — restricted to enrichment-supported
+  // languages (only those have a dictionary to OCR against). Undefined → hide the button.
+  const supportedLangs = languages.filter((l) => resolveLanguage(l.name))
+  const extractLang =
+    supportedLangs.find((l) => l.id === activeLangId) ??
+    supportedLangs.find((l) => l.id === defaultLangId) ??
+    supportedLangs[0]
 
   async function handleUpgrade() {
     setUpgrading(true)
@@ -237,17 +247,28 @@ export function VocabularyClient({ words, languages, activeLangId, plan, totalWo
             </p>
           )}
         </div>
-        <Button
-          className="gap-1.5"
-          onClick={() => {
-            if (!showAddForm && atLimit) { setShowPaywall(true); return }
-            setShowAddForm((v) => { if (!v) setAddForm((f) => ({ ...f, languageId: defaultLangId })); return !v })
-            setEditingId(null)
-          }}
-          disabled={isPending}
-        >
-          {showAddForm ? <><X size={14} strokeWidth={2.5} />Cancel</> : <><Plus size={14} strokeWidth={2.5} />Add Word</>}
-        </Button>
+        <div className="flex items-center gap-2">
+          {extractLang && (
+            <ExtractWordsDialog
+              languageId={extractLang.id}
+              languageName={extractLang.name}
+              atLimit={atLimit}
+              onLimit={() => setShowPaywall(true)}
+              onDone={() => router.refresh()}
+            />
+          )}
+          <Button
+            className="gap-1.5"
+            onClick={() => {
+              if (!showAddForm && atLimit) { setShowPaywall(true); return }
+              setShowAddForm((v) => { if (!v) setAddForm((f) => ({ ...f, languageId: defaultLangId })); return !v })
+              setEditingId(null)
+            }}
+            disabled={isPending}
+          >
+            {showAddForm ? <><X size={14} strokeWidth={2.5} />Cancel</> : <><Plus size={14} strokeWidth={2.5} />Add Word</>}
+          </Button>
+        </div>
       </div>
 
       <LanguageSelector languages={languages} activeLangId={activeLangId} basePath="/vocabulary" />

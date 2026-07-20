@@ -54,6 +54,35 @@ function baseLemmaOf(entries: KaikkiEntry[]): string | null {
   return null
 }
 
+// Resolve a raw token to its dictionary headword for the given source language,
+// reducing inflected forms to their base (parlo/parla → parlare) via kaikki's
+// form-of links. Returns null when the token isn't a real word in the language
+// (no dictionary senses directly or through its base lemma). Used by the image
+// word-extraction flow both to validate "is this real Italian?" and to collapse
+// different forms of the same word to a single entry. Two kaikki fetches at most.
+// The headword's kaikki entries are returned alongside so the caller can pass
+// them to enrichLemma and skip re-fetching the same word.
+export async function resolveHeadword(
+  rawText: string,
+  language: string
+): Promise<{ headword: string; entries: KaikkiEntry[] } | null> {
+  const adapter = resolveLanguage(language)
+  if (!adapter) return null
+  const text = rawText.trim().toLowerCase()
+  if (!text) return null
+
+  const entries = await fetchKaikki(text, adapter.kaikki)
+  // The token itself is a headword (has real, non-form-of senses).
+  if (normalizeSenses(entries).length) return { headword: text, entries }
+  // Otherwise follow the form-of link to the base lemma and validate it.
+  const base = baseLemmaOf(entries)?.trim().toLowerCase()
+  if (base && base !== text) {
+    const baseEntries = await fetchKaikki(base, adapter.kaikki)
+    if (normalizeSenses(baseEntries).length) return { headword: base, entries: baseEntries }
+  }
+  return null
+}
+
 // kaikki glosses are English. For non-English targets, translate each gloss,
 // falling back to the English gloss when translation fails.
 async function translateSenses(senses: RawSense[], target: TargetLang): Promise<RawSense[]> {
@@ -191,7 +220,10 @@ function normalizeExamples(
 export async function enrichLemma(
   rawText: string,
   language: string,
-  targetCode: string
+  targetCode: string,
+  // Optional kaikki entries already fetched for this exact headword (e.g. by
+  // resolveHeadword during image extraction) — reused to avoid a duplicate fetch.
+  prefetched?: KaikkiEntry[]
 ): Promise<EnrichedLemma | null> {
   const adapter = resolveLanguage(language)
   if (!adapter) return null
@@ -214,7 +246,7 @@ export async function enrichLemma(
 
   try {
     const [entries, tatoeba] = await Promise.all([
-      fetchKaikki(text, adapter.kaikki),
+      prefetched ?? fetchKaikki(text, adapter.kaikki),
       fetchTatoeba(text, adapter.tatoeba, target.tatoeba),
     ])
     // If the word is purely an inflected form (kaikki has only "form-of" senses,
