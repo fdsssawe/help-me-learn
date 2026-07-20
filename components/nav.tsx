@@ -7,6 +7,7 @@ import { LayoutDashboard, BookOpen, Zap, LogOut } from "lucide-react"
 import { ThemeToggle } from "./theme-toggle"
 import { StreakFlame } from "@/components/ui/streak-flame"
 import { LevelBadge } from "@/components/ui/level-badge"
+import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar"
 import {
   DropdownMenu,
   DropdownMenuTrigger,
@@ -82,9 +83,10 @@ export function Nav({ user }: { user: NavUser }) {
               className="flex cursor-pointer items-center gap-2 rounded-[var(--radius)] border border-border bg-bg-subtle py-1 pl-1.5 pr-1.5 transition-colors hover:bg-bg-hover sm:pr-2.5"
               aria-label="Account menu"
             >
-              <span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-primary text-[0.8rem] font-bold text-primary-fg">
-                {initial}
-              </span>
+              <Avatar>
+                {user.image && <AvatarImage src={user.image} alt="" />}
+                <AvatarFallback>{initial}</AvatarFallback>
+              </Avatar>
               <span className="hidden max-w-[120px] truncate text-[0.85rem] font-semibold text-text sm:inline">
                 {displayName}
               </span>
