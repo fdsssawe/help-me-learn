@@ -2,11 +2,13 @@
 
 import { useState, useTransition, useRef } from "react"
 import { useRouter } from "next/navigation"
-import { Pencil, Trash2, Sprout, Plus, X, ChevronDown } from "lucide-react"
-import { createWord, updateWord, deleteWord, suggestWords, getLemmaDetail } from "@/app/actions/words"
+import { Pencil, Trash2, Sprout, Plus, X, ChevronDown, ListChecks, Loader2 } from "lucide-react"
+import { createWord, updateWord, deleteWord, deleteWords, suggestWords, getLemmaDetail } from "@/app/actions/words"
 import { LanguageSelector } from "@/components/language-selector"
 import { LangTag } from "@/components/lang-tag"
 import { Button } from "@/components/ui/button"
+import { Checkbox } from "@/components/ui/checkbox"
+import { ConfirmDialog } from "@/components/ui/alert-dialog"
 import { Collapsible, CollapsibleContent } from "@/components/ui/collapsible"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Autocomplete, AutocompleteInput, AutocompleteContent, AutocompleteItem } from "@/components/ui/autocomplete"
@@ -33,6 +35,11 @@ interface VocabularyClientProps {
 }
 
 type LemmaDetail = NonNullable<Awaited<ReturnType<typeof getLemmaDetail>>>
+
+// Pending deletion, driving the shared confirm dialog.
+type PendingDelete =
+  | { type: "single"; id: string; word: string }
+  | { type: "bulk"; count: number }
 
 function isEnriched(word: Word) {
   const c = word.lemma?._count
@@ -66,6 +73,11 @@ export function VocabularyClient({ words, languages, activeLangId, plan, totalWo
   const [formError, setFormError] = useState("")
   const [showPaywall, setShowPaywall] = useState(false)
   const [upgrading, setUpgrading] = useState(false)
+  // Multi-select delete.
+  const [selectionMode, setSelectionMode] = useState(false)
+  const [selected, setSelected] = useState<Set<string>>(new Set())
+  const [pendingDelete, setPendingDelete] = useState<PendingDelete | null>(null)
+  const [deletingId, setDeletingId] = useState<string | null>(null)
   const atLimit = plan === "free" && totalWords >= FREE_WORD_LIMIT
 
   // Language used by the image word-extraction flow: prefer the active language,
@@ -213,13 +225,58 @@ export function VocabularyClient({ words, languages, activeLangId, plan, totalWo
     startTransition(async () => {
       await updateWord(id, { word: editForm.word.trim(), translation: editForm.translation.trim(), notes: editForm.notes.trim() || undefined, languageId: editForm.languageId || null })
       setEditingId(null)
+      toast.success("Changes saved")
       router.refresh()
     })
   }
 
-  function handleDelete(id: string, wordText: string) {
-    if (!window.confirm(`Delete "${wordText}"? This cannot be undone.`)) return
-    startTransition(async () => { await deleteWord(id); toast.success("Word deleted"); router.refresh() })
+  // ── Multi-select ──────────────────────────────────────────────────────────
+  function enterSelectionMode() {
+    setSelectionMode(true)
+    setShowAddForm(false)
+    setEditingId(null)
+  }
+  function exitSelectionMode() {
+    setSelectionMode(false)
+    setSelected(new Set())
+  }
+  function toggleSelect(id: string) {
+    setSelected((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
+  const allFilteredSelected = filtered.length > 0 && filtered.every((w) => selected.has(w.id))
+  function toggleSelectAll() {
+    setSelected(allFilteredSelected ? new Set() : new Set(filtered.map((w) => w.id)))
+  }
+
+  function handleConfirmDelete() {
+    if (!pendingDelete) return
+    if (pendingDelete.type === "single") {
+      const id = pendingDelete.id
+      setDeletingId(id)
+      startTransition(async () => {
+        await deleteWord(id)
+        setSelected((prev) => { const n = new Set(prev); n.delete(id); return n })
+        setDeletingId(null)
+        setPendingDelete(null)
+        toast.success("Word deleted")
+        router.refresh()
+      })
+    } else {
+      const ids = [...selected]
+      startTransition(async () => {
+        await deleteWords(ids)
+        setSelected(new Set())
+        setSelectionMode(false)
+        setPendingDelete(null)
+        toast.success(`${ids.length} ${ids.length === 1 ? "word" : "words"} deleted`)
+        router.refresh()
+      })
+    }
   }
 
   const activeLang = languages.find((l) => l.id === activeLangId)
@@ -247,28 +304,36 @@ export function VocabularyClient({ words, languages, activeLangId, plan, totalWo
             </p>
           )}
         </div>
-        <div className="flex items-center gap-2">
-          {extractLang && (
-            <ExtractWordsDialog
-              languageId={extractLang.id}
-              languageName={extractLang.name}
-              atLimit={atLimit}
-              onLimit={() => setShowPaywall(true)}
-              onDone={() => router.refresh()}
-            />
-          )}
-          <Button
-            className="gap-1.5"
-            onClick={() => {
-              if (!showAddForm && atLimit) { setShowPaywall(true); return }
-              setShowAddForm((v) => { if (!v) setAddForm((f) => ({ ...f, languageId: defaultLangId })); return !v })
-              setEditingId(null)
-            }}
-            disabled={isPending}
-          >
-            {showAddForm ? <><X size={14} strokeWidth={2.5} />Cancel</> : <><Plus size={14} strokeWidth={2.5} />Add Word</>}
-          </Button>
-        </div>
+        {!selectionMode && (
+          <div className="flex items-center gap-2">
+            {words.length > 0 && (
+              <Button variant="ghost" className="gap-1.5" onClick={enterSelectionMode}>
+                <ListChecks size={15} strokeWidth={2} />
+                Select
+              </Button>
+            )}
+            {extractLang && (
+              <ExtractWordsDialog
+                languageId={extractLang.id}
+                languageName={extractLang.name}
+                atLimit={atLimit}
+                onLimit={() => setShowPaywall(true)}
+                onDone={() => router.refresh()}
+              />
+            )}
+            <Button
+              className="gap-1.5"
+              onClick={() => {
+                if (!showAddForm && atLimit) { setShowPaywall(true); return }
+                setShowAddForm((v) => { if (!v) setAddForm((f) => ({ ...f, languageId: defaultLangId })); return !v })
+                setEditingId(null)
+              }}
+              disabled={isPending}
+            >
+              {showAddForm ? <><X size={14} strokeWidth={2.5} />Cancel</> : <><Plus size={14} strokeWidth={2.5} />Add Word</>}
+            </Button>
+          </div>
+        )}
       </div>
 
       <LanguageSelector languages={languages} activeLangId={activeLangId} basePath="/vocabulary" />
@@ -349,7 +414,43 @@ export function VocabularyClient({ words, languages, activeLangId, plan, totalWo
       {/* Search */}
       {words.length > 0 && (
         <div className="mb-4">
-          <input className="input" placeholder="Search words, translations, notes…" value={search} onChange={(e) => setSearch(e.target.value)} />
+          <input className="input" aria-label="Search vocabulary" placeholder="Search words, translations, notes…" value={search} onChange={(e) => setSearch(e.target.value)} />
+        </div>
+      )}
+
+      {/* Selection action bar */}
+      {selectionMode && (
+        <div className="sticky top-[68px] z-30 mb-3 flex items-center justify-between gap-3 rounded-[var(--radius)] border border-primary/40 bg-primary-subtle px-3 py-2 shadow-[var(--shadow-sm)] animate-fade-in">
+          <div className="flex items-center gap-3 min-w-0">
+            <button
+              type="button"
+              onClick={exitSelectionMode}
+              aria-label="Exit selection"
+              className="flex size-7 items-center justify-center rounded-[var(--radius-sm)] text-text-secondary transition-colors hover:bg-bg-hover cursor-pointer"
+            >
+              <X size={16} strokeWidth={2.5} />
+            </button>
+            <span className="text-[0.9rem] font-semibold text-text truncate">
+              {selected.size} selected
+            </span>
+            <button
+              type="button"
+              onClick={toggleSelectAll}
+              className="text-[0.82rem] font-semibold text-primary hover:underline cursor-pointer shrink-0"
+            >
+              {allFilteredSelected ? "Clear" : "Select all"}
+            </button>
+          </div>
+          <Button
+            variant="destructive"
+            size="sm"
+            className="gap-1.5"
+            disabled={selected.size === 0 || isPending}
+            onClick={() => setPendingDelete({ type: "bulk", count: selected.size })}
+          >
+            <Trash2 size={14} strokeWidth={2.2} />
+            Delete
+          </Button>
         </div>
       )}
 
@@ -377,7 +478,7 @@ export function VocabularyClient({ words, languages, activeLangId, plan, totalWo
               return (
                 <div key={word.id} className="card-elevated animate-slide-up p-5">
                   <form onSubmit={(e) => handleEditSubmit(e, word.id)} className="flex flex-col gap-3">
-                    <div className="grid grid-cols-2 gap-3">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                       <div>
                         <label className={labelCls}>Word *</label>
                         <input className="input" value={editForm.word} onChange={(e) => setEditForm((f) => ({ ...f, word: e.target.value }))} autoFocus />
@@ -415,10 +516,29 @@ export function VocabularyClient({ words, languages, activeLangId, plan, totalWo
 
             const showDetails = isEnriched(word)
             const open = openIds.has(word.id)
+            const isSelected = selected.has(word.id)
+            const isDeleting = deletingId === word.id
 
             return (
-              <Collapsible key={word.id} open={open} onOpenChange={() => handleToggle(word)} className="card animate-fade-in">
-                <div className="flex items-start justify-between gap-4 px-[1.125rem] py-[0.875rem]">
+              <Collapsible
+                key={word.id}
+                open={open}
+                onOpenChange={() => { if (!selectionMode) handleToggle(word) }}
+                className={`card animate-fade-in transition-shadow ${isSelected ? "ring-2 ring-primary" : ""}`}
+              >
+                <div
+                  className={`flex items-start gap-3 px-[1.125rem] py-[0.875rem] ${selectionMode ? "cursor-pointer select-none" : ""}`}
+                  onClick={selectionMode ? () => toggleSelect(word.id) : undefined}
+                >
+                  {selectionMode && (
+                    <div className="pt-0.5" onClick={(e) => e.stopPropagation()}>
+                      <Checkbox
+                        checked={isSelected}
+                        onCheckedChange={() => toggleSelect(word.id)}
+                        aria-label={`Select ${word.word}`}
+                      />
+                    </div>
+                  )}
                   <div className="flex-1 min-w-0">
                     <div className="flex items-baseline gap-2 flex-wrap">
                       <span className="font-bold text-text">{word.word}</span>
@@ -438,21 +558,23 @@ export function VocabularyClient({ words, languages, activeLangId, plan, totalWo
                       </span>
                     </div>
                   </div>
-                  <div className="flex gap-1 shrink-0 items-center">
-                    {showDetails && (
-                      <Button variant="ghost" size="icon" title={open ? "Hide details" : "Dictionary details"} onClick={() => handleToggle(word)}>
-                        <ChevronDown size={16} strokeWidth={2} className={`transition-transform duration-200 ${open ? "rotate-180" : ""}`} />
+                  {!selectionMode && (
+                    <div className="flex gap-1 shrink-0 items-center">
+                      {showDetails && (
+                        <Button variant="ghost" size="icon" aria-label={open ? "Hide dictionary details" : "Show dictionary details"} title={open ? "Hide details" : "Dictionary details"} onClick={() => handleToggle(word)}>
+                          <ChevronDown size={16} strokeWidth={2} className={`transition-transform duration-200 ${open ? "rotate-180" : ""}`} />
+                        </Button>
+                      )}
+                      <Button variant="ghost" size="icon" aria-label={`Edit ${word.word}`} title="Edit" onClick={() => startEdit(word)}>
+                        <Pencil size={14} strokeWidth={2} />
                       </Button>
-                    )}
-                    <Button variant="ghost" size="icon" title="Edit" onClick={() => startEdit(word)} disabled={isPending}>
-                      <Pencil size={14} strokeWidth={2} />
-                    </Button>
-                    <Button variant="ghost" size="icon" title="Delete" onClick={() => handleDelete(word.id, word.word)} disabled={isPending}>
-                      <Trash2 size={14} strokeWidth={2} />
-                    </Button>
-                  </div>
+                      <Button variant="ghost" size="icon" aria-label={`Delete ${word.word}`} title="Delete" onClick={() => setPendingDelete({ type: "single", id: word.id, word: word.word })} disabled={isDeleting}>
+                        {isDeleting ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} strokeWidth={2} />}
+                      </Button>
+                    </div>
+                  )}
                 </div>
-                {showDetails && word.lemma && (
+                {showDetails && word.lemma && !selectionMode && (
                   <CollapsibleContent>
                     <div className="border-t border-border px-[1.125rem] py-3.5">
                       {details[word.lemma.id] ? (
@@ -472,6 +594,25 @@ export function VocabularyClient({ words, languages, activeLangId, plan, totalWo
           })}
         </div>
       )}
+
+      <ConfirmDialog
+        open={!!pendingDelete}
+        onOpenChange={(o) => { if (!o) setPendingDelete(null) }}
+        title={
+          pendingDelete?.type === "bulk"
+            ? `Delete ${pendingDelete.count} ${pendingDelete.count === 1 ? "word" : "words"}?`
+            : "Delete this word?"
+        }
+        description={
+          pendingDelete?.type === "single"
+            ? `“${pendingDelete.word}” will be removed from your vocabulary. This cannot be undone.`
+            : "The selected words will be removed from your vocabulary. This cannot be undone."
+        }
+        confirmLabel="Delete"
+        pendingLabel="Deleting…"
+        pending={isPending}
+        onConfirm={handleConfirmDelete}
+      />
     </div>
   )
 }

@@ -2,9 +2,12 @@ import Link from "next/link"
 import { Flame, BookOpen, PenLine, Medal, Zap, Plus, Star, FileText, Sprout } from "lucide-react"
 import { LangTag } from "@/components/lang-tag"
 import { getDashboardStats } from "@/app/actions/quiz"
-import { getLevel, getLevelProgress, getXpToNextLevel } from "@/lib/levels"
+import { getLevelProgress, getXpToNextLevel } from "@/lib/levels"
 import { BADGE_DISPLAY } from "@/lib/badge-display"
 import { Button } from "@/components/ui/button"
+import { Badge } from "@/components/ui/badge"
+import { XpBar } from "@/components/ui/xp-bar"
+import { LevelBadge } from "@/components/ui/level-badge"
 
 const MODE_LABELS: Record<string, string> = {
   last_lesson: "Last Lesson",
@@ -25,7 +28,6 @@ export default async function DashboardPage() {
     )
   }
 
-  const level = getLevel(user.xp)
   const progress = getLevelProgress(user.xp)
   const xpToNext = getXpToNextLevel(user.xp)
   const badges: string[] = JSON.parse(user.badges)
@@ -41,6 +43,22 @@ export default async function DashboardPage() {
         </h1>
         <p className="text-text-secondary">Keep up the great work — every word counts.</p>
       </div>
+
+      {/* First-run onboarding nudge */}
+      {wordCount === 0 && (
+        <div className="card-elevated animate-slide-up mb-6 flex flex-col items-start gap-3 border-[1.5px] border-primary bg-primary-subtle p-6 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h2 className="font-display text-[1.15rem] font-bold text-text mb-1">Let&apos;s add your first words</h2>
+            <p className="text-[0.9rem] text-text-secondary">
+              Add a few words — snap a photo of a page or type them in — then quiz yourself to start your streak.
+            </p>
+          </div>
+          <Button className="gap-1.5 shrink-0" nativeButton={false} render={<Link href="/vocabulary" />}>
+            <Plus size={15} strokeWidth={2.5} />
+            Add words
+          </Button>
+        </div>
+      )}
 
       {/* Streak + Level */}
       <div className="card-elevated p-6 mb-6">
@@ -61,17 +79,10 @@ export default async function DashboardPage() {
           {/* Level + XP */}
           <div className="flex-1 min-w-[200px]">
             <div className="flex items-center justify-between mb-2">
-              <span
-                className="badge"
-                style={{ background: `${level.color}22`, color: level.color, border: `1px solid ${level.color}44`, fontSize: "0.8rem" }}
-              >
-                {level.name}
-              </span>
+              <LevelBadge xp={user.xp} />
               <span className="text-[0.82rem] text-text-muted">{user.xp} XP</span>
             </div>
-            <div className="xp-bar animate-xp-pulse">
-              <div className="xp-bar-fill" style={{ width: `${progress}%` }} />
-            </div>
+            <XpBar value={progress} className="animate-xp-pulse" />
             {xpToNext > 0 && <div className="text-[0.78rem] text-text-muted mt-1.5">{xpToNext} XP to next level</div>}
             {xpToNext === 0 && <div className="text-[0.78rem] text-[var(--xp)] mt-1.5 font-bold">Max level reached!</div>}
           </div>
@@ -94,14 +105,14 @@ export default async function DashboardPage() {
       </div>
 
       {/* Quick actions */}
-      <div className="grid grid-cols-2 gap-4 mb-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
         <Link
           href="/quiz"
           className="card flex flex-col gap-2 p-5 no-underline transition-all bg-primary-subtle border-[1.5px] border-primary"
         >
           <Zap size={22} strokeWidth={1.75} className="text-primary" />
-          <span className="font-display text-[1.1rem] text-primary font-bold">Start Today's Quiz</span>
-          <span className="text-[0.82rem] text-text-secondary">Test what you've learned</span>
+          <span className="font-display text-[1.1rem] text-primary font-bold">Start Today&apos;s Quiz</span>
+          <span className="text-[0.82rem] text-text-secondary">Test what you&apos;ve learned</span>
         </Link>
         <Link href="/vocabulary" className="card flex flex-col gap-2 p-5 no-underline transition-all">
           <Plus size={22} strokeWidth={1.75} className="text-text-secondary" />
@@ -151,9 +162,7 @@ export default async function DashboardPage() {
                     >
                       {session.score}/{session.total}
                     </span>
-                    <span className="badge" style={{ background: "var(--xp-bg)", color: "var(--xp)", fontSize: "0.75rem" }}>
-                      +{session.xpEarned} XP
-                    </span>
+                    <Badge variant="xp" size="sm">+{session.xpEarned} XP</Badge>
                   </div>
                 </div>
               )
@@ -168,9 +177,9 @@ export default async function DashboardPage() {
           <h2 className="font-display text-[1.2rem] text-text mb-3">Your Badges</h2>
           <div className="flex gap-2 flex-wrap">
             {badges.map((key) => (
-              <span key={key} className="badge animate-pop" style={{ background: "var(--gold)", color: "#fff", fontSize: "0.85rem", padding: "5px 12px" }}>
+              <Badge key={key} variant="gold" className="animate-pop">
                 {BADGE_DISPLAY[key] ?? key}
-              </span>
+              </Badge>
             ))}
           </div>
         </div>

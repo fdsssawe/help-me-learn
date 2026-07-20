@@ -8,6 +8,7 @@ import { getQuizWords, saveQuizSession } from "@/app/actions/quiz"
 import { BADGE_DISPLAY } from "@/lib/badge-display"
 import { answerMatches, normalizeAnswer } from "@/lib/quiz-match"
 import { Button } from "@/components/ui/button"
+import { Badge } from "@/components/ui/badge"
 
 type QuizMode = "last_lesson" | "last_week" | "random_30"
 type Word = Awaited<ReturnType<typeof getQuizWords>>[number]
@@ -258,9 +259,9 @@ function QuizSessionInner() {
             <p className="font-display text-text mb-2">New badges earned!</p>
             <div className="flex gap-2 justify-center flex-wrap">
               {results.newBadges.map((key) => (
-                <span key={key} className="badge bg-gold text-white text-[0.9rem] px-3.5 py-1.5">
+                <Badge key={key} variant="gold" className="px-3.5 py-1.5 text-[0.9rem]">
                   {BADGE_DISPLAY[key] ?? key}
-                </span>
+                </Badge>
               ))}
             </div>
           </div>

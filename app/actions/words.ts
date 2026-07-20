@@ -163,6 +163,14 @@ export async function deleteWord(id: string) {
   revalidatePath("/vocabulary")
 }
 
+// Bulk delete (multi-select on the vocabulary page). Single query, ownership-scoped.
+export async function deleteWords(ids: string[]) {
+  const userId = await requireUser()
+  if (!ids.length) return
+  await prisma.word.deleteMany({ where: { id: { in: ids }, userId } })
+  revalidatePath("/vocabulary")
+}
+
 export async function getWordCountByDate() {
   const userId = await requireUser()
   const words = await prisma.word.findMany({

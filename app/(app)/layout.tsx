@@ -7,11 +7,19 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   if (!user) redirect("/sign-in")
 
   return (
-    <div style={{ minHeight: "100dvh", display: "flex", flexDirection: "column", background: "var(--bg)" }}>
-      <Nav user={{ name: user.name, email: user.email, image: user.image, nativeLang: user.nativeLang, plan: user.plan }} />
-      <main style={{ flex: 1, maxWidth: 1100, margin: "0 auto", width: "100%", padding: "32px 24px 64px" }}>
-        {children}
-      </main>
+    <div className="flex min-h-[100dvh] flex-col bg-bg">
+      <Nav
+        user={{
+          name: user.name,
+          email: user.email,
+          image: user.image,
+          nativeLang: user.nativeLang,
+          plan: user.plan,
+          xp: user.xp,
+          streak: user.streak,
+        }}
+      />
+      <main className="flex-1 w-full">{children}</main>
     </div>
   )
 }

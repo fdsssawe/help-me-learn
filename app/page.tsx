@@ -3,6 +3,7 @@ import { BookOpen, Zap, Flame } from "lucide-react"
 import { ThemeToggle } from "@/components/theme-toggle"
 import { Button } from "@/components/ui/button"
 import { SITE_NAME, SITE_DESCRIPTION, SITE_URL } from "@/lib/site"
+import { LEVELS } from "@/lib/levels"
 
 const jsonLd = {
   "@context": "https://schema.org",
@@ -24,31 +25,23 @@ const FEATURES = [
     Icon: BookOpen,
     title: "Build Your Vocabulary",
     desc: "Add words and translations in any language pair. Keep notes, track when you learned them.",
-    colorClass: "text-[#C85A2E]",
-    bgClass: "bg-[rgba(200,90,46,0.08)]",
+    colorClass: "text-primary",
+    bgClass: "bg-primary/10",
   },
   {
     Icon: Zap,
     title: "Daily Quizzes",
     desc: "Test yesterday's lesson, this week's words, or a random mix. Short, focused, effective.",
-    colorClass: "text-[#3D8C5E]",
-    bgClass: "bg-[rgba(61,140,94,0.08)]",
+    colorClass: "text-success",
+    bgClass: "bg-success/10",
   },
   {
     Icon: Flame,
     title: "Streaks & Progress",
     desc: "Earn XP, level up, and keep your streak alive. Small wins every day add up to fluency.",
-    colorClass: "text-[#E05A20]",
-    bgClass: "bg-[rgba(224,90,32,0.08)]",
+    colorClass: "text-streak",
+    bgClass: "bg-streak/10",
   },
-]
-
-const LEVELS = [
-  { name: "Novice", xp: "0 XP" },
-  { name: "Apprentice", xp: "100 XP" },
-  { name: "Scholar", xp: "300 XP" },
-  { name: "Expert", xp: "700 XP" },
-  { name: "Maestro", xp: "1500 XP" },
 ]
 
 export default function LandingPage() {
@@ -72,7 +65,7 @@ export default function LandingPage() {
 
       {/* Hero */}
       <section className="flex-1 flex flex-col items-center justify-center px-6 pt-20 pb-16 text-center max-w-190 mx-auto w-full">
-        <div className="animate-fade-in inline-flex items-center gap-1.5 px-3.5 py-1 rounded-full bg-primary-subtle border border-[rgba(200,90,46,0.2)] text-primary text-[0.8rem] font-bold tracking-[0.04em] uppercase mb-7">
+        <div className="animate-fade-in inline-flex items-center gap-1.5 px-3.5 py-1 rounded-full bg-primary-subtle border border-primary/25 text-primary text-[0.8rem] font-bold tracking-[0.04em] uppercase mb-7">
           <Zap size={12} strokeWidth={2.5} /> Language learning, reimagined
         </div>
 
@@ -146,7 +139,7 @@ export default function LandingPage() {
               className="card px-4.5 py-2.5 transition-transform duration-200"
               style={{ opacity: 0.4 + i * 0.15, transform: `scale(${0.92 + i * 0.04})` }}
             >
-              <div className="text-[0.75rem] text-text-muted mb-0.5">{l.xp}</div>
+              <div className="text-[0.75rem] text-text-muted mb-0.5">{l.minXp} XP</div>
               <div className="font-bold text-[0.9rem] text-text">{l.name}</div>
             </div>
           ))}

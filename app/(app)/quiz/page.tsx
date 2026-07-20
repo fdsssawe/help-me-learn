@@ -7,6 +7,7 @@ import { getCurrentUser } from "@/lib/dal"
 import { getLanguages } from "@/app/actions/languages"
 import { LanguageSelector } from "@/components/language-selector"
 import { Button } from "@/components/ui/button"
+import { Badge } from "@/components/ui/badge"
 import { StyleToggle } from "./style-toggle"
 import { DirectionToggle } from "./direction-toggle"
 import { subDays, startOfDay, endOfDay } from "date-fns"
@@ -150,16 +151,9 @@ function ModeCardInner({ mode }: { mode: { Icon: LucideIcon; label: string; desc
       <div className="flex-1">
         <div className="flex items-center justify-between gap-2 flex-wrap mb-1">
           <h2 className="font-display text-[1.2rem] text-text m-0">{mode.label}</h2>
-          <span
-            className="badge"
-            style={{
-              background: mode.count > 0 ? "var(--primary-subtle)" : "var(--bg-subtle)",
-              color: mode.count > 0 ? "var(--primary)" : "var(--text-muted)",
-              border: `1px solid ${mode.count > 0 ? "var(--primary)" : "var(--border)"}`,
-            }}
-          >
+          <Badge variant={mode.count > 0 ? "primary" : "default"}>
             {mode.count} {mode.countLabel}
-          </span>
+          </Badge>
         </div>
         <p className="text-[0.9rem] text-text-secondary m-0">{mode.description}</p>
         {mode.count === 0 && <p className="text-[0.8rem] text-text-muted mt-1">No words available for this mode right now.</p>}

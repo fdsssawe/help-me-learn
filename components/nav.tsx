@@ -2,13 +2,21 @@
 
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { useState } from "react"
-import { LayoutDashboard, BookOpen, Zap, LogOut, Sparkles } from "lucide-react"
-import { toast } from "sonner"
+import { useTransition } from "react"
+import { LayoutDashboard, BookOpen, Zap, LogOut } from "lucide-react"
 import { ThemeToggle } from "./theme-toggle"
+import { StreakFlame } from "@/components/ui/streak-flame"
+import { LevelBadge } from "@/components/ui/level-badge"
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+} from "@/components/ui/dropdown-menu"
 import { signOut } from "@/app/actions/auth"
 import { setNativeLang } from "@/app/actions/user"
-import { getCheckoutUrl } from "@/app/actions/billing"
 import { TARGET_LANGUAGES } from "@/lib/enrichment/languages"
 
 const NAV_LINKS = [
@@ -17,126 +25,111 @@ const NAV_LINKS = [
   { href: "/quiz", label: "Quiz", Icon: Zap },
 ]
 
-type NavUser = { name: string | null; email: string | null; image: string | null; nativeLang: string; plan: string }
+type NavUser = {
+  name: string | null
+  email: string | null
+  image: string | null
+  nativeLang: string
+  plan: string
+  xp: number
+  streak: number
+}
 
 export function Nav({ user }: { user: NavUser }) {
   const pathname = usePathname()
-  const [menuOpen, setMenuOpen] = useState(false)
+  const [isPending, startTransition] = useTransition()
 
-  async function handleUpgrade() {
-    setMenuOpen(false)
-    try {
-      window.location.href = await getCheckoutUrl()
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Couldn't start checkout.")
-    }
-  }
-
-  const initial =
-    user.name?.[0]?.toUpperCase() ?? user.email?.[0]?.toUpperCase() ?? "?"
+  const initial = user.name?.[0]?.toUpperCase() ?? user.email?.[0]?.toUpperCase() ?? "?"
   const displayName = user.name ?? user.email?.split("@")[0] ?? "Account"
 
   return (
-    <header className="sticky top-0 z-50 bg-bg-card border-b border-border shadow-sm">
-      <div className="max-w-[1100px] mx-auto px-6 h-[60px] flex items-center justify-between gap-4">
-
+    <header className="sticky top-0 z-50 border-b border-border bg-bg-card shadow-sm">
+      <div className="mx-auto flex h-[60px] max-w-[1100px] items-center justify-between gap-2 px-4 sm:px-6">
         <Link
           href="/dashboard"
-          className="font-display text-[1.35rem] font-bold text-primary tracking-tight no-underline shrink-0"
+          className="shrink-0 font-display text-[1.35rem] font-bold tracking-tight text-primary no-underline"
         >
           Lexora
         </Link>
 
-        <nav className="flex gap-1 items-center">
+        <nav className="flex items-center gap-0.5 sm:gap-1">
           {NAV_LINKS.map(({ href, label, Icon }) => {
             const active = pathname.startsWith(href)
             return (
               <Link
                 key={href}
                 href={href}
-                className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-[var(--radius-sm)] text-[0.9rem] no-underline transition-all ${
+                aria-current={active ? "page" : undefined}
+                className={`flex items-center gap-1.5 rounded-[var(--radius-sm)] px-2.5 py-1.5 text-[0.9rem] no-underline transition-all sm:px-3.5 ${
                   active
-                    ? "font-bold text-primary bg-primary-subtle"
+                    ? "bg-primary-subtle font-bold text-primary"
                     : "font-medium text-text-secondary hover:bg-bg-subtle hover:text-text"
                 }`}
               >
-                <Icon size={15} strokeWidth={active ? 2.5 : 2} />
-                {label}
+                <Icon size={16} strokeWidth={active ? 2.5 : 2} />
+                <span className="hidden sm:inline">{label}</span>
               </Link>
             )
           })}
         </nav>
 
-        <div className="flex items-center gap-2 shrink-0">
+        <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
+          <StreakFlame count={user.streak} className="hidden text-[0.9rem] sm:flex" />
           <ThemeToggle />
 
-          <div className="relative">
-            <button
-              onClick={() => setMenuOpen((v) => !v)}
-              className="flex items-center gap-2 pl-1.5 pr-2.5 py-1 rounded-[var(--radius)] bg-bg-subtle border border-border cursor-pointer transition-all"
+          <DropdownMenu>
+            <DropdownMenuTrigger
+              className="flex cursor-pointer items-center gap-2 rounded-[var(--radius)] border border-border bg-bg-subtle py-1 pl-1.5 pr-1.5 transition-colors hover:bg-bg-hover sm:pr-2.5"
+              aria-label="Account menu"
             >
-              <div className="w-7 h-7 rounded-full bg-primary text-primary-fg flex items-center justify-center text-[0.8rem] font-bold shrink-0">
+              <span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-primary text-[0.8rem] font-bold text-primary-fg">
                 {initial}
-              </div>
-              <span className="text-[0.85rem] font-semibold text-text max-w-[100px] truncate">
+              </span>
+              <span className="hidden max-w-[120px] truncate text-[0.85rem] font-semibold text-text sm:inline">
                 {displayName}
               </span>
-            </button>
+            </DropdownMenuTrigger>
 
-            {menuOpen && (
-              <>
-                <div className="fixed inset-0 z-10" onClick={() => setMenuOpen(false)} />
-                <div className="card-elevated animate-pop absolute top-[calc(100%+8px)] right-0 min-w-[200px] p-1.5 z-20">
-                  <div className="px-3 pt-2 pb-1">
-                    <p className="text-[0.68rem] font-bold uppercase tracking-[0.06em] text-text-muted mb-1.5">Translations in</p>
-                    <div className="flex gap-1">
-                      {TARGET_LANGUAGES.map((t) => {
-                        const active = t.code === user.nativeLang
-                        return (
-                          <button
-                            key={t.code}
-                            onClick={() => setNativeLang(t.code)}
-                            className={`flex-1 px-2 py-1 rounded-[var(--radius-sm)] text-[0.82rem] font-semibold border cursor-pointer transition-colors ${
-                              active
-                                ? "bg-primary-subtle border-primary text-primary"
-                                : "bg-bg-subtle border-border text-text-secondary hover:bg-bg-hover"
-                            }`}
-                          >
-                            {t.label}
-                          </button>
-                        )
-                      })}
-                    </div>
-                  </div>
-                  {/* Upgrade to Pro temporarily hidden (payments paused until Paddle is live).
-                  <div className="h-px bg-border my-1.5" />
-                  {user.plan === "free" ? (
+            <DropdownMenuContent className="min-w-[220px]">
+              {/* Identity + gamification (useful on mobile where the chips are hidden) */}
+              <div className="flex items-center justify-between gap-2 px-3 pb-2 pt-1">
+                <LevelBadge xp={user.xp} />
+                <StreakFlame count={user.streak} className="text-[0.85rem]" />
+              </div>
+              <DropdownMenuSeparator />
+
+              <DropdownMenuLabel>Translations in</DropdownMenuLabel>
+              <div className="flex gap-1 px-2 pb-1.5">
+                {TARGET_LANGUAGES.map((t) => {
+                  const active = t.code === user.nativeLang
+                  return (
                     <button
-                      onClick={handleUpgrade}
-                      className="w-full flex items-center gap-2 px-3 py-2 rounded-[var(--radius-sm)] border-0 bg-transparent text-primary text-[0.9rem] font-semibold cursor-pointer text-left transition-colors hover:bg-primary-subtle"
+                      key={t.code}
+                      type="button"
+                      disabled={isPending || active}
+                      onClick={() => startTransition(async () => { await setNativeLang(t.code) })}
+                      className={`flex-1 cursor-pointer rounded-[var(--radius-sm)] border px-2 py-1 text-[0.82rem] font-semibold transition-colors disabled:cursor-default ${
+                        active
+                          ? "border-primary bg-primary-subtle text-primary"
+                          : "border-border bg-bg-subtle text-text-secondary hover:bg-bg-hover"
+                      }`}
                     >
-                      <Sparkles size={14} />
-                      Upgrade to Pro
+                      {t.label}
                     </button>
-                  ) : (
-                    <div className="w-full flex items-center gap-2 px-3 py-2 text-[0.9rem] font-semibold text-primary">
-                      <Sparkles size={14} />
-                      Pro plan
-                    </div>
-                  )}
-                  */}
-                  <div className="h-px bg-border my-1.5" />
-                  <button
-                    onClick={() => { signOut(); setMenuOpen(false) }}
-                    className="w-full flex items-center gap-2 px-3 py-2 rounded-[var(--radius-sm)] border-0 bg-transparent text-error text-[0.9rem] font-semibold cursor-pointer text-left transition-colors hover:bg-error-bg"
-                  >
-                    <LogOut size={14} />
-                    Sign out
-                  </button>
-                </div>
-              </>
-            )}
-          </div>
+                  )
+                })}
+              </div>
+
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
+                variant="destructive"
+                onClick={() => startTransition(async () => { await signOut() })}
+              >
+                <LogOut size={14} />
+                Sign out
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </div>
     </header>

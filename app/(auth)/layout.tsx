@@ -3,44 +3,17 @@ import { ThemeToggle } from "@/components/theme-toggle"
 
 export default function AuthLayout({ children }: { children: React.ReactNode }) {
   return (
-    <div
-      className="landing-bg"
-      style={{ minHeight: "100dvh", display: "flex", flexDirection: "column" }}
-    >
-      <header
-        style={{
-          padding: "0 24px",
-          height: 64,
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-        }}
-      >
+    <div className="landing-bg flex min-h-[100dvh] flex-col">
+      <header className="flex h-16 items-center justify-between px-4 sm:px-6">
         <Link
           href="/"
-          style={{
-            fontFamily: "var(--font-display)",
-            fontSize: "1.3rem",
-            fontWeight: 700,
-            color: "var(--primary)",
-            textDecoration: "none",
-          }}
+          className="font-display text-[1.3rem] font-bold text-primary no-underline"
         >
           Lexora
         </Link>
         <ThemeToggle />
       </header>
-      <main
-        style={{
-          flex: 1,
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          padding: "24px",
-        }}
-      >
-        {children}
-      </main>
+      <main className="flex flex-1 items-center justify-center p-4 sm:p-6">{children}</main>
     </div>
   )
 }
